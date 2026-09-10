@@ -87,7 +87,7 @@ client-roster row, so the only manual step is listing it in the profile's
 1. Install the package into the target profile's deps — from GitHub (this repo) or npm:
    ```sh
    # from GitHub (git dependency)
-   dsh plugin --profile web add github:<your-username>/dsh-thinking-quips
+   dsh plugin --profile web add github:Saknutella/dsh-thinking-quips
 
    # or from a registry
    dsh plugin --profile web add dsh-thinking-quips
