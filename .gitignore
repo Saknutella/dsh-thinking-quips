@@ -1,0 +1,6 @@
+# Local dev / build artifacts — do NOT push
+node_modules/
+.npmcache/
+*.tgz
+*.log
+.DS_Store

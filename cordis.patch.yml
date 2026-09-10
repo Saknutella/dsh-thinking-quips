@@ -1,0 +1,10 @@
+# dsh-thinking-quips — bundle patch.
+#
+# This package is a DSH *bundle*: adding it to the profile's `dsh.profile.bundles`
+# list is all install needs. This patch registers the package itself as a
+# client-plugin roster row, so the Web UI serves /plugins/<id>/client.js and the
+# browser loads it. Remove the bundle from `dsh.profile.bundles` to uninstall.
+
+- insert:
+    - id: thinking-quips
+      name: 'dsh-thinking-quips'
