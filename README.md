@@ -1,81 +1,85 @@
 # dsh-thinking-quips
 
+[English](README.md) · [中文](README.zh.md)
+
 `v0.1.0` · a **DSH bundle** (install-and-go) · web client plugin
 
-A standalone **DeepSeek Harness client plugin** that rotates playful bilingual
-status quips through the running-turn indicator — the little line the
-conversation shows while the agent is working (the default `Deep diving...`
-shimmer). Stock packages are **not** modified.
+A standalone **DeepSeek Harness client plugin** that rotates playful status quips
+through the running-turn indicator — the line the conversation shows while the
+agent is working (DSH's default `Deep diving...` shimmer) — and puts a chasing
+dot-orbit loading icon in front of it. Stock DSH packages are **not** modified.
 
-![Running status line: the dot-orbit loader with a Chinese quip](assets/screenshot-1.png)
+![Running status line: the dot-orbit loader with a quip](assets/screenshot-1.png)
 
-It ships these features:
+## Features
 
-1. **A 3×3 dot-orbit loading icon** to the left of the running-turn text — the 8
-   outer dots chase clockwise (each lights up then fades with a trailing tail),
-   the center dot stays empty, colored to match the chosen font color / brand
-   blue.
-2. **A single language group** (`跟随界面 / 仅英文 / 仅中文 / 混合`) — one
-   mutually-exclusive control for which language the quips use:
-   - **跟随界面**: Chinese UI → Chinese quips; any non-Chinese UI → English.
-   - **仅英文** / **仅中文**: force one language.
-   - **混合**: mix English + Chinese.
-   (Only applies when the custom quips list is empty.)
-3. **Per-quip display time** — a number input (default **8s**) for how long each
-   quip stays before rotating.
-4. **发光强度 (glow strength)** — a number input (0–100%, default **35%**) for how
-   bright the sweeping highlight is.
-5. **Settings → General → "俏皮话"** with a **font-color** control: a live
-   preview swatch plus **hex** and **RGB** inputs and a **native color wheel**
-   (`<input type="color">`). Default is the DeepSeek brand-blue shimmer.
-6. A **"设置俏皮话" (manage quips)** button that opens a small modal — a
-   **single editable textarea** with `#` language sections and a **Save** button
-   in the footer:
+1. **A 3×3 dot-orbit loading icon** to the left of the running-turn text. The 8
+   outer dots chase clockwise — each lights up and fades with a trailing tail —
+   while the center dot stays empty. Colored to match the chosen font color
+   (brand blue by default).
+2. **Rotating quips**, organized by language in the settings textarea, with one
+   **Language** control deciding which section shows: **Follow UI** (Chinese UI →
+   Chinese quips; any non-Chinese UI → English), **English only**,
+   **Chinese only**, or **Mixed** (both sections).
+3. **Time per quip** — a number input (default **8 s**) for how long each quip
+   stays before rotating.
+4. **Glow strength** — a number input (0–100%, default **35%**) for how bright the
+   sweeping highlight is.
+5. **Font color** — a live preview swatch plus **hex** and **RGB** inputs and a
+   **native color wheel** (`<input type="color">`). The default is the DeepSeek
+   brand-blue shimmer.
+6. **Manage quips** — a small modal with one editable textarea using `#` language
+   sections, and a Save button in the footer:
+
    ```
    # Chinese
-   中文俏皮话一
-   中文俏皮话二
+   a Chinese quip
+   another Chinese quip
    # English
    an English quip
    another English quip
    ```
-   The **语言** group picks which section shows (Mixed→both sections, Chinese
-   only→Chinese section, English only→English section, Follow UI→the UI
-   language's section). Lines before the first `#` header always show.
 
-   **The textarea is the single source of quips**: it ships pre-filled with the
-   default `# Chinese` / `# English` lists, so the plugin reads quips from here
-   (no separate hard-coded fallback). Edit them freely — they persist; `恢复默认`
-   restores the shipped defaults.
+   One quip per line (`;` also works inside a section). Lines before the first
+   `#` header always show, in every mode.
 
-> The running rotator reads `cfg.quipMs`; the sectioned `cfg.quips` is parsed on
-> demand. `cfg.perLang` remains available as a second per-language fallback.
+All of it lives in **Settings → General → Playful quips**.
+
+> The textarea is the **single source of quips**: it ships pre-filled with the
+> default `# Chinese` / `# English` lists, so there is no separate hard-coded
+> fallback. Edits persist; **Reset to default** restores the shipped lists.
+
+The settings UI itself is bilingual and **follows the web UI's language** — this
+page shows the English labels; the [中文 README](README.zh.md) shows the Chinese
+ones you get with a Chinese UI.
 
 ## How it works
 
 While a turn runs, `dsh-client-ui-conversation` renders a `TurnStatus` element
 (`role="status"`, class `...turnStatus`) at the bottom of the chat. That element
-is **hardcoded — not a pluggable slot** — so this plugin hooks it from outside:
-it finds the element and keeps swapping its leading text node to the current
-quip, leaving the trailing clock span intact. A light poll re-asserts the text
-after any React re-render.
+is **hardcoded — not a pluggable slot** — so this plugin hooks it from outside: a
+`MutationObserver` catches it the moment it is committed (so `Deep diving...`
+never flashes), a light poll keeps the text rotating, and only the leading text
+node is swapped, leaving the trailing elapsed-clock span untouched.
 
 Config is persisted to `localStorage` (`dsh-thinking-quips.config`) and mirrored
-in a small reactive store, so the rotator, the color override, and the settings
-row stay in sync. When a custom color is chosen, the plugin injects a `<style>`
-override that replaces only the `background-image` of the `.turnStatus` shimmer
-gradient (keeping the animated clip in the brand base rule intact).
+in a small reactive store, so the rotator, the color override and the settings row
+stay in sync. When a custom color is chosen, the plugin injects a `<style>`
+override that replaces only the `background-image` of the shimmer gradient — DSH's
+own animated shine and text clip stay intact.
 
 ## Files
 
 ```
 dsh-thinking-quips/
-├── package.json        # dsh.bundle (patch) + dsh.client + exports["./client"]
-├── cordis.patch.yml    # bundle patch: registers this package as a client roster row
+├── package.json         # dsh.bundle (patch) + dsh.client + exports["./client"]
+├── cordis.patch.yml     # bundle patch: registers this package as a client roster row
 ├── lib/
-│   ├── client.js       # browser half: rotator + settings row + quips modal
-│   └── index.js        # node half: no-op apply (needed so the loader mounts the row)
-└── README.md
+│   ├── client.js        # browser half: rotator + orbit + settings row + modal
+│   └── index.js         # node half: no-op apply (so the loader can mount the row)
+├── assets/screenshot-1.png
+├── screenshots.json     # screenshot list read by storefronts (repo-only)
+└── test/                # dev-only smoke tests (excluded from the package)
 ```
 
 ## Install (bundle — install and it just works)
@@ -84,7 +88,8 @@ dsh-thinking-quips/
 client-roster row, so the only manual step is listing it in the profile's
 `dsh.profile.bundles`.
 
-1. Install the package into the target profile's deps — from GitHub (this repo) or npm:
+1. Install the package into the target profile's deps — from GitHub (this repo) or
+   a registry:
    ```sh
    # from GitHub (git dependency)
    dsh plugin --profile web add github:Saknutella/dsh-thinking-quips
@@ -103,55 +108,51 @@ client-roster row, so the only manual step is listing it in the profile's
 
 > That's it: the bundle's patch inserts `{id: thinking-quips, name: 'dsh-thinking-quips'}`
 > into the browser roster, and because the package declares `dsh.client`, the Web UI
-> serves `/plugins/dsh-thinking-quips/client.js` and the browser loads it. No hand-editing
-> of `cordis.patch.yml`.
-
-**Uninstall**: remove `dsh-thinking-quips` from `dsh.profile.bundles`, then
-`dsh plugin --profile web remove dsh-thinking-quips`, and restart.
-
-## Usage
-
-Open **Settings → General** (the gear). Under **俏皮话**:
-
-- **字体颜色** — click the swatch or the color wheel; type a `#RRGGBB` hex or
-  RGB values. The turn-status shimmer recolors in real time. `品牌蓝（默认）`
-  restores the brand-blue shimmer.
-- **每条显示时间** — number input (seconds, default 8) for how long each quip
-  stays before rotating.
-- **发光强度** — number input (0–100%, default 35) for how bright the sweeping
-  highlight is. At the default blue with glow=35 the original brand shimmer is
-  left untouched; changing glow (or picking a custom color) applies a
-  controllable glow in that color.
-- **语言** — one group of four mutually-exclusive choices: **跟随界面** (follow
-  the UI language; non-Chinese → English), **仅英文**, **仅中文**, **混合**.
-  This decides which section of the quips list shows.
-- **设置俏皮话** — opens the modal: the textarea is **pre-filled with the
-  default `# Chinese` / `# English` quips**. Edit freely (one quip per line;
-  `;` also works within a section), then **保存**. The **语言** group picks
-  which section shows; lines before the first `#` header always show. `恢复默认`
-  restores the shipped defaults.
-
-## Tune
-
-Edit the constants at the top of `lib/client.js`:
-
-- `PHRASES_EN` / `PHRASES_ZH` — the default phrase lists.
-- `QUIP_MS` (default `3600`) — how long each quip stays.
-- `POLL_MS` (default `600`) — how often the status text is re-asserted.
-- `DEFAULT_BLUE` (default `#2E5BE8`) — the wheel start / default brand blue.
+> serves `/plugins/dsh-thinking-quips/client.js` and the browser loads it. No
+> hand-editing of `cordis.patch.yml`.
 
 ## Uninstall
 
-1. Remove the `- id: thinking-quips` row from `$DSH_HOME/profiles/web/cordis.patch.yml`.
-2. Delete the `dsh-thinking-quips` package (`dsh plugin --profile web remove dsh-thinking-quips`).
-3. Restart `dsh web`.
+Remove `dsh-thinking-quips` from `dsh.profile.bundles`, then
+`dsh plugin --profile web remove dsh-thinking-quips`, and restart `dsh web`.
+
+## Usage
+
+Open **Settings → General** and find **Playful quips**:
+
+- **Font color** — click the swatch or the color wheel; type a `#RRGGBB` hex or
+  RGB values. The turn-status shimmer recolors in real time. **Brand blue
+  (default)** restores the original shimmer.
+- **Time per quip** — seconds per quip (default 8).
+- **Glow strength** — 0–100% (default 35). At brand blue with glow 35 the original
+  shimmer is left untouched; changing the glow (or picking a custom color) applies
+  a controllable highlight in that color.
+- **Language** — one group of four: **Follow UI**, **English only**,
+  **Chinese only**, **Mixed**. This decides which section of the quips list shows.
+- **Manage quips** — opens the modal; **Save** writes the textarea back.
+- **Reset to default** — restores the shipped defaults.
+
+## Tune
+
+Defaults live in `lib/client.js`:
+
+- `DEFAULT_QUIPS` — the shipped quip lists (already sectioned `# Chinese` /
+  `# English`).
+- `DEFAULT_BLUE` (default `#2E5BE8`) — the color wheel's starting color.
+- `POLL_MS` (default `600`) — how often the status text is re-asserted.
+- `quipMs` / `glow` — per-quip timing and highlight strength (per-user, in
+  `DEFAULTS`).
 
 ## Notes / limits
 
-- The color override only replaces the shimmer gradient colors; the animated
+- The plugin is **additive**: one package plus one line in `dsh.profile.bundles`,
+  and no DSH file is touched. Uninstalling restores stock DSH.
+- The status element is matched by the stable `turnStatus` class token first, then
+  by the literal `Deep diving` text. If a future DSH build renames both, the plugin
+  silently stops matching — it never throws and never breaks the shell.
+- The color override only replaces the shimmer's gradient colors; the animated
   shine and the text clip come from DSH's own `.turnStatus` rule.
-- Custom quips and color persist in `localStorage` (per browser profile), not in
-  the DSH settings document — simple and sync-free.
-- The hook matches the status element by the stable `turnStatus` class token
-  first, then falls back to the literal `Deep diving` text. If a future DSH build
-  renames both, the plugin stops matching and does nothing (it never throws).
+- Config (quips, color, glow, timing) persists in `localStorage` per browser
+  profile, not in the DSH settings document.
+- Requires DSH's web surface (a profile bundling `@deepseek-ai/dsh-web-app`) and
+  React 18, which DSH ships.
