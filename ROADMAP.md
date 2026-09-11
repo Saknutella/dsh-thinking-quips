@@ -18,9 +18,11 @@ point. Everything below serves that.
       the first status line appears.
 - [x] **Declared requirements** — `>= 0.1.2-rc.1`, repository/homepage/bugs metadata,
       optional harness peer dependencies.
-- [x] **DSH 0.1.5 compatibility** — the status line moved to `dsh-client-ui-chat` and
-      its label became the i18n key `chat.deepDiving`; both the English and Chinese
-      labels are now matched.
+- [x] **Hardened status-line matching** — DSH 0.1.5 moved the status line into
+      `dsh-client-ui-chat` and localized its label to the `chat.deepDiving` key. The
+      primary class-token match was unaffected (0.1.0 already worked on 0.1.5); the
+      label fallback now also covers the Chinese label, as insurance for the day the
+      class token itself changes.
 
 ## 0.3.0 — Indicator options
 
