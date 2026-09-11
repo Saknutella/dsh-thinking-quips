@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.1.0` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.2.0` · a **DSH bundle** (install-and-go) · web client plugin
 
 A standalone **DeepSeek Harness client plugin** that rotates playful status quips
 through the running-turn indicator — the line the conversation shows while the
@@ -42,8 +42,14 @@ dot-orbit loading icon in front of it. Stock DSH packages are **not** modified.
 
    One quip per line (`;` also works inside a section). Lines before the first
    `#` header always show, in every mode.
+7. **Indicator-only mode** — inject only the icon and leave the status text alone,
+   so the plugin can coexist with another status-text plugin instead of replacing it.
 
 All of it lives in **Settings → General → Playful quips**.
+
+> **Requires DSH >= 0.1.2-rc.1** (the web surface). Config lives in `localStorage` —
+> no config file, no network requests, no file writes. `prefers-reduced-motion` is
+> respected, and the status element is matched by its stable class token first.
 
 > The textarea is the **single source of quips**: it ships pre-filled with the
 > default `# Chinese` / `# English` lists, so there is no separate hard-coded

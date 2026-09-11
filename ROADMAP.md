@@ -20,9 +20,9 @@ point. Everything below serves that.
       optional harness peer dependencies.
 - [x] **Hardened status-line matching** — DSH 0.1.5 moved the status line into
       `dsh-client-ui-chat` and localized its label to the `chat.deepDiving` key. The
-      primary class-token match was unaffected (0.1.0 already worked on 0.1.5); the
-      label fallback now also covers the Chinese label, as insurance for the day the
-      class token itself changes.
+      primary class-token match was unaffected (plugin v0.1.0 already worked on DSH
+      0.1.5); the label fallback now also covers the Chinese label, as insurance for
+      the day the class token itself changes.
 
 ## 0.3.0 — Indicator options
 
