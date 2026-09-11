@@ -1,6 +1,6 @@
 {
   "name": "dsh-thinking-quips",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Rotating playful bilingual status quips plus a dot-orbit loader for the DeepSeek Harness running-turn indicator. A drop-in DSH web client plugin (bundle).",
   "type": "module",
   "main": "lib/index.js",
@@ -14,7 +14,8 @@
     "assets",
     "cordis.patch.yml",
     "README.md",
-    "README.zh.md"
+    "README.zh.md",
+    "ROADMAP.md"
   ],
   "dsh": {
     "bundle": {
@@ -26,14 +27,51 @@
         "@deepseek-ai/dsh-client-locale",
         "@deepseek-ai/dsh-client-ui-settings-general"
       ],
-      "platform": "web"
+      "platform": "web",
+      "immediately": true
     }
   },
   "keywords": [
+    "dsh",
     "deepseek-harness",
+    "dsh-plugin",
+    "plugin",
     "client-plugin",
+    "web-ui",
+    "status-line",
     "ui",
     "status"
   ],
+  "author": {
+    "name": "Saknutella",
+    "url": "https://github.com/Saknutella"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Saknutella/dsh-thinking-quips.git"
+  },
+  "homepage": "https://github.com/Saknutella/dsh-thinking-quips#readme",
+  "bugs": {
+    "url": "https://github.com/Saknutella/dsh-thinking-quips/issues"
+  },
+  "peerDependencies": {
+    "@deepseek-ai/dsh-client-runtime": "*",
+    "@deepseek-ai/dsh-client-locale": "*",
+    "@deepseek-ai/dsh-client-ui-settings-general": "*"
+  },
+  "peerDependenciesMeta": {
+    "@deepseek-ai/dsh-client-runtime": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-locale": {
+      "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-settings-general": {
+      "optional": true
+    }
+  },
+  "engines": {
+    "dsh": ">=0.1.2-rc.1"
+  },
   "license": "MIT"
 }

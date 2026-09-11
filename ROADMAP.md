@@ -5,35 +5,40 @@ element in front of the turn-status text — and stays deliberately small. It is
 trying to be a phrase engine: the text rotation is one feature, the indicator is the
 point. Everything below serves that.
 
-`v0.1.0` today ships the dot-orbit indicator, rotating quips, and a General-settings
-panel (font color, glow strength, per-quip timing, sectioned quips editor).
-
 ---
 
-## 0.2.0 — Indicator options
+## 0.2.0 — Coexistence & quiet (current)
+
+- [x] **Indicator-only mode** — keep the dot-orbit icon, leave the status text
+      untouched, so the plugin can sit alongside another status-text plugin instead
+      of replacing it.
+- [x] **Respect `prefers-reduced-motion`** — the indicator stops animating when the
+      OS asks for reduced motion.
+- [x] **Boot-time prefetch** (`dsh.client.immediately`) so the plugin is ready before
+      the first status line appears.
+- [x] **Declared requirements** — `>= 0.1.2-rc.1`, repository/homepage/bugs metadata,
+      optional harness peer dependencies.
+- [x] **DSH 0.1.5 compatibility** — the status line moved to `dsh-client-ui-chat` and
+      its label became the i18n key `chat.deepDiving`; both the English and Chinese
+      labels are now matched.
+
+## 0.3.0 — Indicator options
 
 The indicator is the differentiator, so make it a first-class, configurable element.
 
-- [ ] **Loader styles** — pick one: dot orbit (current default), ring, pulse, blocks,
-      classic three-dot.
+- [ ] **Loader styles** — dot orbit (current default), ring, pulse, blocks, classic
+      three-dot.
 - [ ] **Size / speed / gap** controls for the chosen style.
 - [ ] **Phase-aware indicator** — calmer while the model is thinking, quicker while a
       tool is running, warmer on a long turn.
 - [ ] **Elapsed-progress ring** — the ring fills as the turn runs, so the indicator
       carries information, not just motion.
 
-## 0.3.0 — Theme & quiet
+## 0.4.0 — Theme & languages
 
-- [ ] **Follow theme** — derive the default color from the active DSH theme's accent
-      (the `--dsw-static-*` tokens) instead of a fixed brand blue.
+- [ ] **Follow theme** — derive the default color from the active DSH theme accent
+      instead of a fixed brand blue.
 - [ ] **Color presets** — brand blue / violet / teal / amber, one click each.
-- [ ] **Respect `prefers-reduced-motion`** — stop the indicator animation (and any
-      shimmer) automatically when the OS asks for reduced motion.
-
-## 0.4.0 — Coexistence & languages
-
-- [ ] **Icon-only mode** — keep the indicator, leave the status text untouched, so the
-      plugin can sit alongside another status-text plugin instead of replacing it.
 - [ ] **Generalize the `# <language>` sections** beyond Chinese / English: any
       `# <name>` header becomes a selectable section, and "Follow UI" maps the DSH
       locale onto it.

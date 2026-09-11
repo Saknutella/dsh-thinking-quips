@@ -129,6 +129,9 @@ Open **Settings → General** and find **Playful quips**:
   a controllable highlight in that color.
 - **Language** — one group of four: **Follow UI**, **English only**,
   **Chinese only**, **Mixed**. This decides which section of the quips list shows.
+- **Indicator only** — inject only the dot-orbit icon and leave the status text
+  alone, so the plugin can sit alongside another status-text plugin instead of
+  replacing it.
 - **Manage quips** — opens the modal; **Save** writes the textarea back.
 - **Reset to default** — restores the shipped defaults.
 
@@ -148,11 +151,13 @@ Defaults live in `lib/client.js`:
 - The plugin is **additive**: one package plus one line in `dsh.profile.bundles`,
   and no DSH file is touched. Uninstalling restores stock DSH.
 - The status element is matched by the stable `turnStatus` class token first, then
-  by the literal `Deep diving` text. If a future DSH build renames both, the plugin
-  silently stops matching — it never throws and never breaks the shell.
+  by the default label — `Deep diving...` / `深度求索中...`, which DSH renders from its
+  `chat.deepDiving` key. If a future DSH build renames both, the plugin silently
+  stops matching — it never throws and never breaks the shell.
 - The color override only replaces the shimmer's gradient colors; the animated
   shine and the text clip come from DSH's own `.turnStatus` rule.
 - Config (quips, color, glow, timing) persists in `localStorage` per browser
   profile, not in the DSH settings document.
-- Requires DSH's web surface (a profile bundling `@deepseek-ai/dsh-web-app`) and
-  React 18, which DSH ships.
+- **Requires DSH >= 0.1.2-rc.1** (the web surface — a profile bundling
+  `@deepseek-ai/dsh-web-app`) and React 18, which DSH ships. Verified on
+  `0.1.5-rc.2`, where the running-status line lives in `dsh-client-ui-chat`.
