@@ -68,6 +68,7 @@ globalThis.document = {
 	head: { appendChild: (el) => { if (el && el.id) stylesById[el.id] = el; } },
 	getElementById: (id) => stylesById[id] || null,
 	createElement: (tag) => (tag === "style" ? makeStyleEl() : makeEl(tag)),
+	createElementNS: (_ns, tag) => makeEl(tag),
 	createTreeWalker: () => { let called = false; return { nextNode: () => (called ? null : (called = true, statusEl.children[0])) }; },
 	querySelectorAll: (sel) => (sel === '[role="status"]' ? [statusEl] : [])
 };
@@ -116,7 +117,7 @@ const iValue = (cell) => cell.style.props["--i"];
 const ORBIT_ORDER = ["0", "1", "2", "7", null, "3", "6", "5", "4"];
 const CASES = [
 	{ loader: "orbit", size: "md", cls: "tq-loader-orbit", scale: "1", cells: 9, indices: ORBIT_ORDER },
-	{ loader: "ring", size: "md", cls: "tq-loader-ring", scale: "1", cells: 1, indices: ["0"] },
+	{ loader: "ring", size: "md", cls: "tq-loader-ring", scale: "1", cells: 0, indices: [] },
 	{ loader: "pulse", size: "sm", cls: "tq-loader-pulse", scale: "0.8", cells: 1, indices: ["0"] },
 	{ loader: "dots", size: "lg", cls: "tq-loader-dots", scale: "1.25", cells: 3, indices: ["0", "1", "2"] },
 	{ loader: "bars", size: "lg", cls: "tq-loader-bars", scale: "1.25", cells: 3, indices: ["0", "1", "2"] }
@@ -126,14 +127,16 @@ for (const c of CASES) {
 	const span = applyWith(c.loader, c.size);
 	if (!span._classes.includes(c.cls)) throw new Error(`${c.loader}: expected class ${c.cls}, got "${span.className}"`);
 	if (span.getAttribute("data-style") !== c.loader) throw new Error(`${c.loader}: data-style=${span.getAttribute("data-style")}`);
-	if (span.children.length !== c.cells) throw new Error(`${c.loader}: expected ${c.cells} cells, got ${span.children.length}`);
+	// Only `<i>` cells count: the ring's `<svg>` is checked separately below.
+	const cells = span.children.filter((child) => child.tagName === "i");
+	if (cells.length !== c.cells) throw new Error(`${c.loader}: expected ${c.cells} cells, got ${cells.length}`);
 	c.indices.forEach((want, i) => {
-		const got = iValue(span.children[i]) ?? null;
+		const got = iValue(cells[i]) ?? null;
 		if (got !== want) throw new Error(`${c.loader}: cell ${i} --i expected ${want}, got ${got}`);
 	});
 	const scale = span.style.props["--tq-loader-scale"];
 	if (scale !== c.scale) throw new Error(`${c.loader}: scale expected ${c.scale}, got ${scale}`);
-	console.log(`OK   ${c.loader.padEnd(5)} size=${c.size} cells=${c.cells} scale=${scale} :: ${span.className}`);
+	console.log(`OK   ${c.loader.padEnd(5)} size=${c.size} cells=${cells.length} scale=${scale} :: ${span.className}`);
 }
 
 // The orbit's blank centre must be transparent and unanimated.
@@ -176,28 +179,49 @@ if (css.indexOf("prefers-reduced-motion") === -1) throw new Error("CSS does not 
 if (css.indexOf(".tq-loader{") === -1) throw new Error("CSS missing the shared .tq-loader base rule");
 console.log(`OK   CSS covers 5 styles + keyframes + reduced motion (${css.length} bytes)`);
 
-// The ring must be a real ring: a faint full track under a bright half-arc. A
-// two-border-only arc reads as a "C" in a still frame, which is what shipped in
-// 0.4.0/0.4.1.
+// The ring must be REAL SVG geometry, not CSS borders: `border-radius:50%` with
+// per-side colours meets at mitred corners, which read as a rounded square at 16px
+// (shipped that way in 0.4.0-0.4.2), and a two-border arc alone reads as a "C".
 function rule(selector) {
 	const m = new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\{([^}]*)\\}").exec(css);
 	if (!m) throw new Error(`CSS rule not found: ${selector}`);
 	return m[1];
 }
+const ringSpan = applyWith("ring", "md");
+const ringSvg = ringSpan.children[0];
+if (!ringSvg || ringSvg.tagName !== "svg") throw new Error("the ring does not build an <svg>");
+if (ringSpan.children.length !== 1) throw new Error(`the ring should hold exactly one svg, got ${ringSpan.children.length}`);
+if (ringSvg.getAttribute("viewBox") !== "0 0 16 16") throw new Error(`ring viewBox is ${ringSvg.getAttribute("viewBox")}`);
+const circles = ringSvg.children.filter((c) => c.tagName === "circle");
+if (circles.length !== 2) throw new Error(`the ring needs a track and an arc, got ${circles.length} circles`);
+// SVG className is not a string, so the plugin sets the class ATTRIBUTE — read it back the same way.
+const classes = circles.map((c) => c.getAttribute("class"));
+if (classes.join(",") !== "tq-ringTrack,tq-ringArc") throw new Error(`unexpected ring circles: ${classes.join(",")}`);
+for (const c of circles) {
+	if (c.getAttribute("r") !== "6.5" || c.getAttribute("cx") !== "8" || c.getAttribute("cy") !== "8") {
+		throw new Error(`ring circle is off-centre: ${JSON.stringify(c._attrs)}`);
+	}
+}
+console.log("OK   ring = <svg viewBox=0 0 16 16> with a centre-8 r-6.5 track + arc");
+
 const ringBox = rule(".tq-loader-ring");
-const ringTrack = rule(".tq-loader-ring::before");
-const ringArc = rule(".tq-loader-ring i");
+const ringSvgCss = rule(".tq-loader-ring svg");
+const ringTrack = rule(".tq-loader-ring .tq-ringTrack");
+const ringArc = rule(".tq-loader-ring .tq-ringArc");
 if (!/width:16px/.test(ringBox) || !/height:16px/.test(ringBox)) throw new Error(`ring box is not 16x16: ${ringBox}`);
 if (!/display:block/.test(ringBox)) throw new Error("ring box is not block-level (width/height would not apply if it stops being a flex item)");
-if (!/position:relative/.test(ringBox)) throw new Error("ring container is not a positioning context");
-if (!/border-radius:50%/.test(ringTrack) || !/border:2px solid currentColor/.test(ringTrack)) throw new Error(`ring track is not a full ring: ${ringTrack}`);
+if (!/width:16px/.test(ringSvgCss) || !/height:16px/.test(ringSvgCss)) throw new Error(`ring svg is not 16x16: ${ringSvgCss}`);
+if (!/overflow:visible/.test(ringSvgCss)) throw new Error("ring svg would clip its own stroke");
+if (!/animation:tq-spin/.test(ringSvgCss)) throw new Error("ring svg does not spin");
+if (!/fill:none/.test(ringTrack) || !/stroke:currentColor/.test(ringTrack)) throw new Error(`ring track is not a stroked circle: ${ringTrack}`);
+if (!/stroke-width:2/.test(ringTrack)) throw new Error("ring track has the wrong stroke width");
 if (!/opacity:\.2/.test(ringTrack)) throw new Error("ring track is not faint");
-if (!/position:absolute/.test(ringTrack) || !/inset:0/.test(ringTrack)) throw new Error("ring track does not fill the box");
-if (!/border-radius:50%/.test(ringArc)) throw new Error("ring arc is not round");
-if (!/border:2px solid transparent/.test(ringArc)) throw new Error(`ring arc has no transparent borders: ${ringArc}`);
-if (!/border-top-color:currentColor/.test(ringArc) || !/border-right-color:currentColor/.test(ringArc)) throw new Error("ring arc is not a half arc");
-if (!/position:absolute/.test(ringArc) || !/inset:0/.test(ringArc)) throw new Error("ring arc does not overlay the track");
-if (!/animation:tq-spin/.test(ringArc)) throw new Error("ring arc does not spin");
-console.log("OK   ring = 16px box + faint full track + bright half-arc on top");
+if (!/fill:none/.test(ringArc) || !/stroke:currentColor/.test(ringArc)) throw new Error(`ring arc is not a stroked circle: ${ringArc}`);
+if (!/stroke-linecap:round/.test(ringArc)) throw new Error("ring arc ends are not rounded");
+if (!/stroke-dasharray:[\d.]+ [\d.]+/.test(ringArc)) throw new Error(`ring arc is not a dash arc: ${ringArc}`);
+if (rule("@media (prefers-reduced-motion:reduce)").indexOf(".tq-loader svg{animation:none") === -1) {
+	throw new Error("reduced motion does not stop the ring");
+}
+console.log("OK   ring CSS = stroked track (20%) + round-capped dash arc + reduced-motion stop");
 
 console.log("ALL LOADER CHECKS PASSED");
