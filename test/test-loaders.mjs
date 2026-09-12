@@ -176,4 +176,28 @@ if (css.indexOf("prefers-reduced-motion") === -1) throw new Error("CSS does not 
 if (css.indexOf(".tq-loader{") === -1) throw new Error("CSS missing the shared .tq-loader base rule");
 console.log(`OK   CSS covers 5 styles + keyframes + reduced motion (${css.length} bytes)`);
 
+// The ring must be a real ring: a faint full track under a bright half-arc. A
+// two-border-only arc reads as a "C" in a still frame, which is what shipped in
+// 0.4.0/0.4.1.
+function rule(selector) {
+	const m = new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\{([^}]*)\\}").exec(css);
+	if (!m) throw new Error(`CSS rule not found: ${selector}`);
+	return m[1];
+}
+const ringBox = rule(".tq-loader-ring");
+const ringTrack = rule(".tq-loader-ring::before");
+const ringArc = rule(".tq-loader-ring i");
+if (!/width:16px/.test(ringBox) || !/height:16px/.test(ringBox)) throw new Error(`ring box is not 16x16: ${ringBox}`);
+if (!/display:block/.test(ringBox)) throw new Error("ring box is not block-level (width/height would not apply if it stops being a flex item)");
+if (!/position:relative/.test(ringBox)) throw new Error("ring container is not a positioning context");
+if (!/border-radius:50%/.test(ringTrack) || !/border:2px solid currentColor/.test(ringTrack)) throw new Error(`ring track is not a full ring: ${ringTrack}`);
+if (!/opacity:\.2/.test(ringTrack)) throw new Error("ring track is not faint");
+if (!/position:absolute/.test(ringTrack) || !/inset:0/.test(ringTrack)) throw new Error("ring track does not fill the box");
+if (!/border-radius:50%/.test(ringArc)) throw new Error("ring arc is not round");
+if (!/border:2px solid transparent/.test(ringArc)) throw new Error(`ring arc has no transparent borders: ${ringArc}`);
+if (!/border-top-color:currentColor/.test(ringArc) || !/border-right-color:currentColor/.test(ringArc)) throw new Error("ring arc is not a half arc");
+if (!/position:absolute/.test(ringArc) || !/inset:0/.test(ringArc)) throw new Error("ring arc does not overlay the track");
+if (!/animation:tq-spin/.test(ringArc)) throw new Error("ring arc does not spin");
+console.log("OK   ring = 16px box + faint full track + bright half-arc on top");
+
 console.log("ALL LOADER CHECKS PASSED");
