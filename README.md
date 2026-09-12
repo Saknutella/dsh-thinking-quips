@@ -2,12 +2,13 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.3.0` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.4.0` · a **DSH bundle** (install-and-go) · web client plugin
 
 A standalone **DeepSeek Harness client plugin** that rotates playful status quips
 through the running-turn indicator — the line the conversation shows while the
 agent is working (DSH's default `Deep diving...` shimmer) — and puts a chasing
-loading icon in front of it (five styles, three sizes). Stock DSH packages are
+loading icon in front of it (five styles, three sizes). The colors can be picked
+by hand or matched to the active theme in one click. Stock DSH packages are
 **not** modified.
 
 ![Running status line: the loading icon with a quip](assets/screenshot-1.png)
@@ -37,7 +38,14 @@ loading icon in front of it (five styles, three sizes). Stock DSH packages are
 5. **Font color** — a live preview swatch plus **hex** and **RGB** inputs and a
    **native color wheel** (`<input type="color">`). The default is the DeepSeek
    brand-blue shimmer.
-6. **Manage quips** — a small modal with one editable textarea using `#` language
+6. **Match theme** — one button reads the accent color of the **active theme** off
+   the live DOM (`--dsw-alias-link`, i.e. DSH's own light/dark accent, so a
+   third-party theme's tokens come along for free), keeps the hue and fits the
+   lightness until the color reaches **≥ 4.5:1 contrast** against the current
+   background. Once matched the color **keeps following** theme switches
+   (light ↔ dark, or a theme change) until you edit the color by hand; the row
+   reports what it read and what it produced (`#4176e6 → #3970e5 · contrast 4.5:1 · light`).
+7. **Manage quips** — a small modal with one editable textarea using `#` language
    sections, and a Save button in the footer:
 
    ```
@@ -51,7 +59,7 @@ loading icon in front of it (five styles, three sizes). Stock DSH packages are
 
    One quip per line (`;` also works inside a section). Lines before the first
    `#` header always show, in every mode.
-7. **Indicator-only mode** — inject only the icon and leave the status text alone,
+8. **Indicator-only mode** — inject only the icon and leave the status text alone,
    so the plugin can coexist with another status-text plugin instead of replacing it.
 
 All of it lives in **Settings → General → Playful quips**.
@@ -83,6 +91,16 @@ stay in sync. When a custom color is chosen, the plugin injects a `<style>`
 override that replaces only the `background-image` of the shimmer gradient — DSH's
 own animated shine and text clip stay intact.
 
+**Match theme** reads the theme instead of guessing at it. DSH's layout presenter
+writes every theme token onto `<body>` as an inline custom property (and toggles
+`body[data-ds-dark-theme]`), so the button resolves `--dsw-alias-link` —
+falling back through `--dsw-alias-state-business-primary` and the
+`--dsw-static-deepseek-*` ramp — from computed styles *of the button itself*,
+which inherits them. The background comes from `--dsw-alias-bg-base`. A second
+`MutationObserver` watches those body attributes, so while the follow flag is on
+a theme switch re-fits the color automatically. Everything is read from the DOM:
+no DSH package is imported and no theme service is required.
+
 ## Files
 
 ```
@@ -95,6 +113,11 @@ dsh-thinking-quips/
 ├── assets/screenshot-1.png
 ├── screenshots.json     # screenshot list read by storefronts (repo-only)
 └── test/                # dev-only smoke tests (excluded from the package)
+    ├── test-load.mjs      # factory/apply/color override/rotation/cleanup
+    ├── test-sections.mjs  # quip sections + language selection
+    ├── test-loaders.mjs   # the five loading indicators (DOM + CSS)
+    ├── test-theme.mjs     # theme extraction + contrast fitting
+    └── test-i18n.mjs      # zh/en dictionary parity
 ```
 
 ## Install (bundle — install and it just works)
@@ -138,6 +161,11 @@ Open **Settings → General** and find **Playful quips**:
 - **Font color** — click the swatch or the color wheel; type a `#RRGGBB` hex or
   RGB values. The turn-status shimmer recolors in real time. **Brand blue
   (default)** restores the original shimmer.
+- **Match theme** — the button next to the inputs reads the active theme's accent,
+  fits it to the current background and applies it; the line underneath reports
+  `#read → #applied · contrast N:1 · light|dark`. While it is active the button
+  reads **Following theme** and the color tracks theme switches; touching the
+  wheel, hex or RGB inputs stops the follow and hands control back to you.
 - **Time per quip** — seconds per quip (default 8).
 - **Glow strength** — 0–100% (default 35). At brand blue with glow 35 the original
   shimmer is left untouched; changing the glow (or picking a custom color) applies
@@ -162,9 +190,15 @@ Defaults live in `lib/client.js`:
 - `LOADER_STYLES` — the loader dropdown order (`orbit`, `ring`, `pulse`, `dots`,
   `bars`); `LOADER_SCALES` — the `sm`/`md`/`lg` multipliers (`0.8` / `1` / `1.25`).
 - `DEFAULT_BLUE` (default `#2E5BE8`) — the color wheel's starting color.
+- `THEME_COLOR_TOKENS` — the accent candidates Match theme tries in order
+  (`--dsw-alias-link`, `--dsw-alias-state-business-primary`,
+  `--dsw-static-deepseek-500`, `--dsw-static-deepseek-450`); `THEME_BG_TOKENS` —
+  the background candidates; `MIN_CONTRAST` (default `4.5`) — the contrast the
+  fitted color must reach.
 - `POLL_MS` (default `600`) — how often the status text is re-asserted.
-- `quipMs` / `glow` / `loader` / `loaderSize` — per-quip timing, highlight
-  strength and the icon default (per-user, in `DEFAULTS`).
+- `quipMs` / `glow` / `loader` / `loaderSize` / `colorTheme` — per-quip timing,
+  highlight strength, the icon default and the theme-follow flag (per-user, in
+  `DEFAULTS`).
 
 ## Notes / limits
 
@@ -176,6 +210,11 @@ Defaults live in `lib/client.js`:
   stops matching — it never throws and never breaks the shell.
 - The color override only replaces the shimmer's gradient colors; the animated
   shine and the text clip come from DSH's own `.turnStatus` rule.
+- **Match theme** reads *computed* custom properties, so it follows whatever the
+  active theme (built-in or third-party) actually paints, and it never imports a
+  DSH package. If none of the candidate tokens resolve — an unusual build, or a
+  theme that rewrites the whole token set — it falls back to fitting the brand
+  blue and says so instead of failing.
 - Config (quips, color, glow, timing) persists in `localStorage` per browser
   profile, not in the DSH settings document.
 - **Requires DSH >= 0.1.2-rc.1** (the web surface — a profile bundling

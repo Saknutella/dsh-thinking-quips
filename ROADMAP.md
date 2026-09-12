@@ -24,7 +24,7 @@ point. Everything below serves that.
       0.1.5); the label fallback now also covers the Chinese label, as insurance for
       the day the class token itself changes.
 
-## 0.3.0 — Indicator options (current)
+## 0.3.0 — Indicator options
 
 The indicator is the differentiator, so make it a first-class, configurable element.
 
@@ -39,10 +39,13 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Elapsed-progress ring** — the ring fills as the turn runs, so the indicator
       carries information, not just motion.
 
-## 0.4.0 — Theme & languages
+## 0.4.0 — Theme & languages (current)
 
-- [ ] **Follow theme** — derive the default color from the active DSH theme accent
-      instead of a fixed brand blue.
+- [x] **Match theme** — one button reads the active theme's accent off the live DOM
+      (`--dsw-alias-link` → `--dsw-alias-state-business-primary` →
+      `--dsw-static-deepseek-*`), keeps the hue and fits the lightness until the
+      colour reaches 4.5:1 against `--dsw-alias-bg-base`. Follows theme switches
+      until the colour is edited by hand.
 - [ ] **Color presets** — brand blue / violet / teal / amber, one click each.
 - [ ] **Generalize the `# <language>` sections** beyond Chinese / English: any
       `# <name>` header becomes a selectable section, and "Follow UI" maps the DSH
