@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.4.0` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.4.1` · a **DSH bundle** (install-and-go) · web client plugin
 
 A standalone **DeepSeek Harness client plugin** that rotates playful status quips
 through the running-turn indicator — the line the conversation shows while the
@@ -43,8 +43,10 @@ by hand or matched to the active theme in one click. Stock DSH packages are
    third-party theme's tokens come along for free), keeps the hue and fits the
    lightness until the color reaches **≥ 4.5:1 contrast** against the current
    background. Once matched the color **keeps following** theme switches
-   (light ↔ dark, or a theme change) until you edit the color by hand; the row
-   reports what it read and what it produced (`#4176e6 → #3970e5 · contrast 4.5:1 · light`).
+   (light ↔ dark, or a theme change) until you press **Stop following** or edit the
+   color by hand; the row reports what it read and what it produced
+   (`#4176e6 → #3970e5 · contrast 4.5:1 · light`), and a **Back to brand blue**
+   button appears whenever a custom color is in effect.
 7. **Manage quips** — a small modal with one editable textarea using `#` language
    sections, and a Save button in the footer:
 
@@ -117,6 +119,7 @@ dsh-thinking-quips/
     ├── test-sections.mjs  # quip sections + language selection
     ├── test-loaders.mjs   # the five loading indicators (DOM + CSS)
     ├── test-theme.mjs     # theme extraction + contrast fitting
+    ├── test-settings-ui.mjs # which buttons the settings row shows in which state
     └── test-i18n.mjs      # zh/en dictionary parity
 ```
 
@@ -159,13 +162,16 @@ Remove `dsh-thinking-quips` from `dsh.profile.bundles`, then
 Open **Settings → General** and find **Playful quips**:
 
 - **Font color** — click the swatch or the color wheel; type a `#RRGGBB` hex or
-  RGB values. The turn-status shimmer recolors in real time. **Brand blue
-  (default)** restores the original shimmer.
+  RGB values. The turn-status shimmer recolors in real time.
 - **Match theme** — the button next to the inputs reads the active theme's accent,
   fits it to the current background and applies it; the line underneath reports
   `#read → #applied · contrast N:1 · light|dark`. While it is active the button
-  reads **Following theme** and the color tracks theme switches; touching the
-  wheel, hex or RGB inputs stops the follow and hands control back to you.
+  reads **Following theme** and the color tracks every theme switch.
+- **Stop following** — appears next to it only while following: it keeps the color
+  that is on screen and drops the follow flag. Editing the wheel, hex or RGB inputs
+  does the same thing, so following never traps you.
+- **Back to brand blue** — appears only once a custom color is set, and restores
+  DSH's own untouched shimmer (the plugin's color override is removed entirely).
 - **Time per quip** — seconds per quip (default 8).
 - **Glow strength** — 0–100% (default 35). At brand blue with glow 35 the original
   shimmer is left untouched; changing the glow (or picking a custom color) applies

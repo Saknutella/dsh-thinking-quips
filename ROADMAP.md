@@ -45,7 +45,8 @@ The indicator is the differentiator, so make it a first-class, configurable elem
       (`--dsw-alias-link` → `--dsw-alias-state-business-primary` →
       `--dsw-static-deepseek-*`), keeps the hue and fits the lightness until the
       colour reaches 4.5:1 against `--dsw-alias-bg-base`. Follows theme switches
-      until the colour is edited by hand.
+      until **Stop following** is pressed or the colour is edited by hand; a
+      **Back to brand blue** button appears whenever a custom colour is in effect.
 - [ ] **Color presets** — brand blue / violet / teal / amber, one click each.
 - [ ] **Generalize the `# <language>` sections** beyond Chinese / English: any
       `# <name>` header becomes a selectable section, and "Follow UI" maps the DSH
