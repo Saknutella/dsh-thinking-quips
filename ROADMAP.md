@@ -7,9 +7,9 @@ point. Everything below serves that.
 
 ---
 
-## 0.2.0 — Coexistence & quiet (current)
+## 0.2.0 — Coexistence & quiet
 
-- [x] **Indicator-only mode** — keep the dot-orbit icon, leave the status text
+- [x] **Indicator-only mode** — keep the loading icon, leave the status text
       untouched, so the plugin can sit alongside another status-text plugin instead
       of replacing it.
 - [x] **Respect `prefers-reduced-motion`** — the indicator stops animating when the
@@ -24,13 +24,16 @@ point. Everything below serves that.
       0.1.5); the label fallback now also covers the Chinese label, as insurance for
       the day the class token itself changes.
 
-## 0.3.0 — Indicator options
+## 0.3.0 — Indicator options (current)
 
 The indicator is the differentiator, so make it a first-class, configurable element.
 
-- [ ] **Loader styles** — dot orbit (current default), ring, pulse, blocks, classic
-      three-dot.
-- [ ] **Size / speed / gap** controls for the chosen style.
+- [x] **Loader styles** — five, chosen in Settings: dot orbit (default), spinner
+      ring, pulse, bouncing dots, equalizer bars. All share the configured font
+      color and swap in place.
+- [x] **Icon size** — small / medium / large (`0.8` / `1` / `1.25`), applied as a
+      `--tq-loader-scale` transform so every style scales together.
+- [ ] **Speed / gap** controls for the chosen style.
 - [ ] **Phase-aware indicator** — calmer while the model is thinking, quicker while a
       tool is running, warmer on a long turn.
 - [ ] **Elapsed-progress ring** — the ring fills as the turn runs, so the indicator

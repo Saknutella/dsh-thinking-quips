@@ -2,21 +2,30 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.2.0` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.3.0` · a **DSH bundle** (install-and-go) · web client plugin
 
 A standalone **DeepSeek Harness client plugin** that rotates playful status quips
 through the running-turn indicator — the line the conversation shows while the
 agent is working (DSH's default `Deep diving...` shimmer) — and puts a chasing
-dot-orbit loading icon in front of it. Stock DSH packages are **not** modified.
+loading icon in front of it (five styles, three sizes). Stock DSH packages are
+**not** modified.
 
-![Running status line: the dot-orbit loader with a quip](assets/screenshot-1.png)
+![Running status line: the loading icon with a quip](assets/screenshot-1.png)
 
 ## Features
 
-1. **A 3×3 dot-orbit loading icon** to the left of the running-turn text. The 8
-   outer dots chase clockwise — each lights up and fades with a trailing tail —
-   while the center dot stays empty. Colored to match the chosen font color
-   (brand blue by default).
+1. **Five animated loading icons**, all in front of the running-turn text and all
+   sized **S / M / L** (defaults: **dot orbit**, **M**):
+
+   | Style | What it looks like |
+   | --- | --- |
+   | **Dot orbit** *(default)* | a 3×3 dot grid where the 8 outer dots chase clockwise — each lights up and fades with a trailing tail — while the center stays empty |
+   | **Spinner ring** | a half-arc ring spinning continuously |
+   | **Pulse** | a single dot breathing in and out |
+   | **Bouncing dots** | three dots bouncing in sequence |
+   | **Equalizer bars** | three bars scaling from the baseline |
+
+   Every style inherits the chosen **font color** (brand blue by default).
 2. **Rotating quips**, organized by language in the settings textarea, with one
    **Language** control deciding which section shows: **Follow UI** (Chinese UI →
    Chinese quips; any non-Chinese UI → English), **English only**,
@@ -81,7 +90,7 @@ dsh-thinking-quips/
 ├── package.json         # dsh.bundle (patch) + dsh.client + exports["./client"]
 ├── cordis.patch.yml     # bundle patch: registers this package as a client roster row
 ├── lib/
-│   ├── client.js        # browser half: rotator + orbit + settings row + modal
+│   ├── client.js        # browser half: rotator + loaders + settings row + modal
 │   └── index.js         # node half: no-op apply (so the loader can mount the row)
 ├── assets/screenshot-1.png
 ├── screenshots.json     # screenshot list read by storefronts (repo-only)
@@ -135,7 +144,10 @@ Open **Settings → General** and find **Playful quips**:
   a controllable highlight in that color.
 - **Language** — one group of four: **Follow UI**, **English only**,
   **Chinese only**, **Mixed**. This decides which section of the quips list shows.
-- **Indicator only** — inject only the dot-orbit icon and leave the status text
+- **Loader icon** — two dropdowns side by side: the **style** (Dot orbit, Spinner
+  ring, Pulse, Bouncing dots, Equalizer bars) and the **size** (Small, Medium,
+  Large). Changes apply to the live status line within a second.
+- **Indicator only** — inject only the loading icon and leave the status text
   alone, so the plugin can sit alongside another status-text plugin instead of
   replacing it.
 - **Manage quips** — opens the modal; **Save** writes the textarea back.
@@ -147,10 +159,12 @@ Defaults live in `lib/client.js`:
 
 - `DEFAULT_QUIPS` — the shipped quip lists (already sectioned `# Chinese` /
   `# English`).
+- `LOADER_STYLES` — the loader dropdown order (`orbit`, `ring`, `pulse`, `dots`,
+  `bars`); `LOADER_SCALES` — the `sm`/`md`/`lg` multipliers (`0.8` / `1` / `1.25`).
 - `DEFAULT_BLUE` (default `#2E5BE8`) — the color wheel's starting color.
 - `POLL_MS` (default `600`) — how often the status text is re-asserted.
-- `quipMs` / `glow` — per-quip timing and highlight strength (per-user, in
-  `DEFAULTS`).
+- `quipMs` / `glow` / `loader` / `loaderSize` — per-quip timing, highlight
+  strength and the icon default (per-user, in `DEFAULTS`).
 
 ## Notes / limits
 
