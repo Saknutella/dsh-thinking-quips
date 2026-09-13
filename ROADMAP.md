@@ -73,8 +73,9 @@ The indicator is the differentiator, so make it a first-class, configurable elem
       is handed back to DSH when the quip list is empty, and the label node React owns
       is blanked rather than removed.
 - [x] **One animation speed** — a single multiplier scales the loading icons, the shape
-      morph, the wave and DSH's shimmer sweep, through one CSS variable (and one elapsed
-      multiplier for the morph). At 1× nothing is overridden at all.
+      morph and the wave, through one CSS variable (and one elapsed multiplier for the
+      morph). DSH's own shimmer is deliberately left at the pace DSH ships. At 1× nothing
+      is overridden at all.
 - [ ] **More effects** — the same machinery admits a typewriter or a per-word fade; the
       tokeniser and the settings dropdown are already in place.
 - [ ] **Effect per language** — CJK and Latin could run different effects, since the

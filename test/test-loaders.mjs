@@ -302,13 +302,14 @@ if (overrideCss.textContent.indexOf(".tq-wave{color:") === -1) throw new Error(`
 console.log("OK   the colour override covers .tq-wave");
 
 // The speed multiplier is a document-level variable, and at 1× nothing is touched.
+// DSH's own shimmer is deliberately NOT scaled, so no stylesheet is injected for the
+// speed at all — only the variable our own animations read.
 applyWith("orbit", "md", false, { speed: 2 });
 if (document.documentElement.style.props["--tq-speed"] !== "2") throw new Error(`--tq-speed was not set: ${JSON.stringify(document.documentElement.style.props)}`);
+if (document.getElementById("dsh-thinking-quips-speed") !== null) throw new Error("a shimmer-speed override was injected; the shimmer must keep DSH's own pace");
 applyWith("orbit", "md", false, { speed: 1 });
 if (document.documentElement.style.props["--tq-speed"] !== undefined) throw new Error("--tq-speed should be removed again at 1×");
-const speedStyle = document.getElementById("dsh-thinking-quips-speed");
-if (speedStyle && speedStyle.textContent !== "") throw new Error("the shimmer duration override should be cleared at 1×");
-console.log("OK   --tq-speed is set at 2× and removed at 1×");
+console.log("OK   --tq-speed is set at 2×, removed at 1×, and never touches the shimmer");
 
 // The morph is driven by requestAnimationFrame, so nothing above would notice a
 // loop that never runs — which is exactly how the offline preview shipped twice with
