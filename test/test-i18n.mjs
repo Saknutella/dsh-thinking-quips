@@ -39,6 +39,7 @@ for (const m of src.matchAll(/\bt\("([^"]+)"/g)) {
 }
 for (const style of listOf("LOADER_STYLES")) used.add(`quips.loader.${style}`);
 for (const size of keysOf("LOADER_SCALES")) used.add(`quips.size.${size}`);
+for (const effect of listOf("TEXT_EFFECTS")) used.add(`quips.effect.${effect}`);
 for (const scheme of ["light", "dark"]) used.add(`quips.scheme.${scheme}`);
 
 let bad = 0;

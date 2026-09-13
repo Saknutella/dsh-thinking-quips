@@ -23,7 +23,7 @@ function makeEl(tag) {
 		tagName: tag,
 		children: [],
 		parentNode: null,
-		style: { props: {}, setProperty(k, v) { this.props[k] = v; } },
+		style: { props: {}, setProperty(k, v) { this.props[k] = v; }, removeProperty(k) { delete this.props[k]; } },
 		_attrs: {},
 		_classes: [],
 		appendChild(child) { el.children.push(child); child.parentNode = el; return child; },
@@ -65,6 +65,7 @@ function makeStatusEl() {
 let statusEl = makeStatusEl();
 globalThis.document = {
 	body: {},
+	documentElement: makeEl("html"),
 	head: { appendChild: (el) => { if (el && el.id) stylesById[el.id] = el; } },
 	getElementById: (id) => stylesById[id] || null,
 	createElement: (tag) => (tag === "style" ? makeStyleEl() : makeEl(tag)),
@@ -105,10 +106,10 @@ if (loaded === null) throw new Error("module did not register a factory");
 const api = loaded.factory(requireStub).__internal;
 if (!api || !Array.isArray(api.LOADER_STYLES)) throw new Error("LOADER_STYLES is not exposed via __internal");
 
-function applyWith(loader, loaderSize, reuse) {
+function applyWith(loader, loaderSize, reuse, extra) {
 	globalThis.window.__DSH_THINKING_QUIPS__ = false; // the once-guard is per-apply
 	globalThis.localStorage = {
-		getItem: () => JSON.stringify({ color: "shimmer", glow: 35, quips: [], loader, loaderSize }),
+		getItem: () => JSON.stringify(Object.assign({ color: "shimmer", glow: 35, quips: [], loader, loaderSize }, extra || {})),
 		setItem: () => {}
 	};
 	if (reuse !== true) statusEl = makeStatusEl();
@@ -241,9 +242,11 @@ if (!/opacity:\.2/.test(ringTrack)) throw new Error("ring track is not faint");
 if (!/fill:none/.test(ringArc) || !/stroke:currentColor/.test(ringArc)) throw new Error(`ring arc is not a stroked circle: ${ringArc}`);
 if (!/stroke-linecap:round/.test(ringArc)) throw new Error("ring arc ends are not rounded");
 if (!/stroke-dasharray:[\d.]+ [\d.]+/.test(ringArc)) throw new Error(`ring arc is not a dash arc: ${ringArc}`);
-if (rule("@media (prefers-reduced-motion:reduce)").indexOf(".tq-loader svg{animation:none") === -1) {
-	throw new Error("reduced motion does not stop the ring");
+const reduced = rule("@media (prefers-reduced-motion:reduce)");
+for (const stopped of [".tq-loader i", ".tq-loader svg", ".tq-waveItem"]) {
+	if (reduced.indexOf(stopped) === -1) throw new Error(`reduced motion does not stop ${stopped}`);
 }
+if (reduced.indexOf("animation:none!important") === -1) throw new Error("the reduced-motion block does not disable animations");
 console.log("OK   ring CSS = stroked track (20%) + round-capped dash arc + reduced-motion stop");
 
 // The morph: one SVG path (rewritten per frame by JS, so no CSS animation may
@@ -267,6 +270,45 @@ if (!/overflow:visible/.test(morphSvgCss)) throw new Error("morph svg would clip
 if (!/fill:none/.test(morphPathCss) || !/stroke:currentColor/.test(morphPathCss)) throw new Error(`morph path is not stroked: ${morphPathCss}`);
 if (!/stroke-width:2/.test(morphPathCss) || !/stroke-linejoin:round/.test(morphPathCss)) throw new Error("morph path stroke is not the ring's 2px round-joined stroke");
 console.log("OK   morph = one stroked <path> in a 16x16 svg, no CSS animation");
+
+// The global speed multiplier must reach every animation the plugin owns, and the
+// wave must carry its own colour and text fill (a wrapped glyph does not reliably
+// take part in DSH's background-clip:text, and would otherwise inherit the
+// transparent fill and vanish).
+console.log("\n── text effect + global speed CSS ──");
+const waveSpanCss = rule(".tq-wave");
+if (!/-webkit-text-fill-color:currentColor/.test(waveSpanCss)) throw new Error(`the wave does not set its own text fill: ${waveSpanCss}`);
+if (!/color:var\(--dsw-static-deepseek-500\)/.test(waveSpanCss)) throw new Error(`the wave has no default colour: ${waveSpanCss}`);
+const waveItemCss = rule(".tq-waveItem");
+if (!/display:inline-block/.test(waveItemCss)) throw new Error(`wave items are not transformable: ${waveItemCss}`);
+if (!/animation:tq-wave/.test(waveItemCss) || !/var\(--tq-speed/.test(waveItemCss)) throw new Error(`the wave animation is not scaled: ${waveItemCss}`);
+if (!/animation-delay:calc\(var\(--i\)[^)]*var\(--tq-speed/.test(waveItemCss)) throw new Error(`the wave stagger is not scaled: ${waveItemCss}`);
+if (!/@keyframes tq-wave\{/.test(css)) throw new Error("the wave keyframes are missing");
+if (css.indexOf('[class*="turnStatus"].tq-waving{animation:none') === -1) throw new Error("nothing stops DSH's sweep while the wave owns the line");
+const scaledRules = [".tq-loader-orbit i", ".tq-loader-ring svg", ".tq-loader-pulse i", ".tq-loader-dots i", ".tq-loader-bars i", ".tq-waveItem"];
+for (const selector of scaledRules) {
+	const body = rule(selector);
+	if (!/var\(--tq-speed/.test(body)) throw new Error(`${selector} ignores the global speed: ${body}`);
+}
+console.log(`OK   wave carries its own colour + fill; ${scaledRules.length} animations honour --tq-speed`);
+
+// The colour override has to reach the wave too, or a custom colour would leave the
+// waving text on the default blue. (Needs a custom colour: at the default shimmer the
+// plugin deliberately injects no override at all.)
+applyWith("orbit", "md", false, { color: "#ff0000" });
+const overrideCss = document.getElementById("dsh-thinking-quips-color");
+if (!overrideCss) throw new Error("no colour override style was injected for a custom colour");
+if (overrideCss.textContent.indexOf(".tq-wave{color:") === -1) throw new Error(`the colour override skips the wave: ${overrideCss.textContent}`);
+console.log("OK   the colour override covers .tq-wave");
+
+// The speed multiplier is a document-level variable, and at 1× nothing is touched.
+applyWith("orbit", "md", false, { speed: 2 });
+if (document.documentElement.style.props["--tq-speed"] !== "2") throw new Error(`--tq-speed was not set: ${JSON.stringify(document.documentElement.style.props)}`);
+applyWith("orbit", "md", false, { speed: 1 });
+if (document.documentElement.style.props["--tq-speed"] !== undefined) throw new Error("--tq-speed should be removed again at 1×");
+const speedStyle = document.getElementById("dsh-thinking-quips-speed");
+if (speedStyle && speedStyle.textContent !== "") throw new Error("the shimmer duration override should be cleared at 1×");
+console.log("OK   --tq-speed is set at 2× and removed at 1×");
 
 // The morph is driven by requestAnimationFrame, so nothing above would notice a
 // loop that never runs — which is exactly how the offline preview shipped twice with

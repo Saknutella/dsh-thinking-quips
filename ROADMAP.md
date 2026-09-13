@@ -54,7 +54,7 @@ The indicator is the differentiator, so make it a first-class, configurable elem
       `# <name>` header becomes a selectable section, and "Follow UI" maps the DSH
       locale onto it.
 
-## 0.5.0 — Shape morph indicator (current)
+## 0.5.0 — Shape morph indicator
 
 - [x] **Shape morph** — one SVG outline that becomes a circle → a rounded triangle
       → a rounded square → a circle, turning with a quintic ease so the rotation
@@ -62,8 +62,23 @@ The indicator is the differentiator, so make it a first-class, configurable elem
       radial profiles, the blend, the path builder, both easings) is pure and
       unit-tested; the frame loop stops itself when the indicator leaves the DOM,
       and reduced-motion keeps a static circle.
-- [ ] **Morph speed** — expose the cycle time (today a fixed 3.3 s), and a
-      no-rotation variant for anyone who wants the shape change on its own.
+- [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
+      for anyone who wants the shape change on its own is still open.
+
+## 0.6.0 — Text effects & one global speed (current)
+
+- [x] **Text effect** — **Shimmer** (DSH's own sweep, default) or **Wave**: each CJK
+      glyph / Latin word lifts in turn, left to right, staggered in pure CSS. The wave
+      owns its colour and text fill, so it does not depend on DSH's text clip; the line
+      is handed back to DSH when the quip list is empty, and the label node React owns
+      is blanked rather than removed.
+- [x] **One animation speed** — a single multiplier scales the loading icons, the shape
+      morph, the wave and DSH's shimmer sweep, through one CSS variable (and one elapsed
+      multiplier for the morph). At 1× nothing is overridden at all.
+- [ ] **More effects** — the same machinery admits a typewriter or a per-word fade; the
+      tokeniser and the settings dropdown are already in place.
+- [ ] **Effect per language** — CJK and Latin could run different effects, since the
+      tokeniser already knows which is which.
 
 ## Later / considered
 
