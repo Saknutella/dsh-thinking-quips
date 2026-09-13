@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.6.1` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.6.2` · a **DSH bundle** (install-and-go) · web client plugin
 
 **Lightweight personalisation for the DeepSeek Harness status line** — the line the
 conversation shows while the agent is working (DSH's default `Deep diving...`).
@@ -27,8 +27,9 @@ packages are **not** modified.
   contrast, and keeps following theme switches until you stop it.
 - **Text effect** — **Shimmer** (DSH's own sideways sweep, default) or **Wave**, which
   lifts each character (CJK) or each word (Latin) in turn, left to right.
-- **Animation speed** — one multiplier for everything the plugin animates: the loading
-  icons, the shape morph and the wave. DSH's own shimmer keeps its pace.
+- **Animation speed** — **Slow / Normal / Fast** in one click. Normal is the shipped
+  pace and overrides nothing; the others step every animation (including DSH's shimmer)
+  to half or double.
 - **Time per quip** and **glow strength**.
 - **Indicator only** — inject just the icon and leave the status text alone, so it
   can sit alongside another status-text plugin.

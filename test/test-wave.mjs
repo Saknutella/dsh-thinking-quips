@@ -190,11 +190,14 @@ ok("an unknown effect falls back to shimmer", (() => {
 	return e2.querySelector(".tq-wave") === null && e2.children[0].nodeValue === "x";
 })());
 
-console.log("\n── the global speed ──");
-ok("speed defaults to 1", api.speedOf({}) === 1 && api.speedOf({ speed: undefined }) === 1);
-ok("speed is clamped", api.speedOf({ speed: 99 }) === api.SPEED_MAX && api.speedOf({ speed: 0.01 }) === api.SPEED_MIN);
-ok("nonsense speeds fall back to 1", api.speedOf({ speed: "fast" }) === 1 && api.speedOf({ speed: NaN }) === 1);
-ok("a valid speed passes through", api.speedOf({ speed: 1.5 }) === 1.5);
+console.log("\n── the animation speed (three steps) ──");
+ok("normal is exactly 1 (the shipped pace)", api.speedOf({ speed: "normal" }) === 1 && api.speedOf({}) === 1);
+ok("slow and fast are a step either side", api.speedOf({ speed: "slow" }) === 0.5 && api.speedOf({ speed: "fast" }) === 2);
+ok("every level is defined", api.SPEED_ORDER.every((l) => typeof api.SPEED_LEVELS[l] === "number"), api.SPEED_ORDER.join(","));
+ok("the level name round-trips", api.SPEED_ORDER.every((l) => api.speedLevel({ speed: l }) === l));
+ok("a numeric speed (0.6.0 config) maps to the nearest level",
+	api.speedLevel({ speed: 0.5 }) === "slow" && api.speedLevel({ speed: 1 }) === "normal" && api.speedLevel({ speed: 2 }) === "fast");
+ok("nonsense speeds fall back to normal", api.speedOf({ speed: "fastest" }) === 1 && api.speedOf({ speed: NaN }) === 1 && api.speedLevel({ speed: "x" }) === "normal");
 ok("every animation is scaled by --tq-speed", (() => {
 	const css = document.getElementById("dsh-thinking-quips-style");
 	return true; // the stylesheet is injected by apply(); checked in test-loaders instead
