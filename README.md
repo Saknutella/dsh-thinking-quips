@@ -2,12 +2,12 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.4.3` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.5.0` · a **DSH bundle** (install-and-go) · web client plugin
 
 A standalone **DeepSeek Harness client plugin** that rotates playful status quips
 through the running-turn indicator — the line the conversation shows while the
 agent is working (DSH's default `Deep diving...` shimmer) — and puts a chasing
-loading icon in front of it (five styles, three sizes). The colors can be picked
+loading icon in front of it (six styles, three sizes). The colors can be picked
 by hand or matched to the active theme in one click. Stock DSH packages are
 **not** modified.
 
@@ -15,13 +15,14 @@ by hand or matched to the active theme in one click. Stock DSH packages are
 
 ## Features
 
-1. **Five animated loading icons**, all in front of the running-turn text and all
+1. **Six animated loading icons**, all in front of the running-turn text and all
    sized **S / M / L** (defaults: **dot orbit**, **M**):
 
    | Style | What it looks like |
    | --- | --- |
    | **Dot orbit** *(default)* | a 3×3 dot grid where the 8 outer dots chase clockwise — each lights up and fades with a trailing tail — while the center stays empty |
    | **Spinner ring** | a real SVG circle: a faint full track with a bright round-capped arc sweeping around it |
+   | **Shape morph** | one outline that becomes a circle → a rounded triangle → a rounded square → a circle again, turning with an eased lag so it settles into each shape |
    | **Pulse** | a single dot breathing in and out |
    | **Bouncing dots** | three dots bouncing in sequence |
    | **Equalizer bars** | three bars scaling from the baseline |
@@ -117,7 +118,8 @@ dsh-thinking-quips/
 └── test/                # dev-only smoke tests (excluded from the package)
     ├── test-load.mjs      # factory/apply/color override/rotation/cleanup
     ├── test-sections.mjs  # quip sections + language selection
-    ├── test-loaders.mjs   # the five loading indicators (DOM + CSS)
+    ├── test-loaders.mjs   # the six loading indicators (DOM + CSS)
+    ├── test-morph.mjs     # the shape-morph geometry and motion quality
     ├── test-theme.mjs     # theme extraction + contrast fitting
     ├── test-settings-ui.mjs # which buttons the settings row shows in which state
     └── test-i18n.mjs      # zh/en dictionary parity
@@ -179,8 +181,8 @@ Open **Settings → General** and find **Playful quips**:
 - **Language** — one group of four: **Follow UI**, **English only**,
   **Chinese only**, **Mixed**. This decides which section of the quips list shows.
 - **Loader icon** — two dropdowns side by side: the **style** (Dot orbit, Spinner
-  ring, Pulse, Bouncing dots, Equalizer bars) and the **size** (Small, Medium,
-  Large). Changes apply to the live status line within a second.
+  ring, Shape morph, Pulse, Bouncing dots, Equalizer bars) and the **size** (Small,
+  Medium, Large). Changes apply to the live status line within a second.
 - **Indicator only** — inject only the loading icon and leave the status text
   alone, so the plugin can sit alongside another status-text plugin instead of
   replacing it.
@@ -194,7 +196,10 @@ Defaults live in `lib/client.js`:
 - `DEFAULT_QUIPS` — the shipped quip lists (already sectioned `# Chinese` /
   `# English`).
 - `LOADER_STYLES` — the loader dropdown order (`orbit`, `ring`, `pulse`, `dots`,
-  `bars`); `LOADER_SCALES` — the `sm`/`md`/`lg` multipliers (`0.8` / `1` / `1.25`).
+  `bars`, `morph`); `LOADER_SCALES` — the `sm`/`md`/`lg` multipliers (`0.8` / `1` / `1.25`).
+- `MORPH_*` — the shape morph: `MORPH_ORDER` (circle → triangle → square),
+  `MORPH_CHAMFER` (how much of each corner is cut, i.e. how rounded the shapes are),
+  `MORPH_RADIUS`, `MORPH_SAMPLES` and `MORPH_CYCLE_MS` (3.3 s, one second per shape).
 - `DEFAULT_BLUE` (default `#2E5BE8`) — the color wheel's starting color.
 - `THEME_COLOR_TOKENS` — the accent candidates Match theme tries in order
   (`--dsw-alias-link`, `--dsw-alias-state-business-primary`,

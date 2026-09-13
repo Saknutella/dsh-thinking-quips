@@ -86,6 +86,8 @@ const requireStub = (name) => {
 
 await import("../lib/client.js");
 if (loaded === null) throw new Error("module did not register a factory");
+const api = loaded.factory(requireStub).__internal;
+if (!api || !Array.isArray(api.LOADER_STYLES)) throw new Error("LOADER_STYLES is not exposed via __internal");
 
 function applyWith(loader, loaderSize, reuse) {
 	globalThis.window.__DSH_THINKING_QUIPS__ = false; // the once-guard is per-apply
@@ -120,7 +122,8 @@ const CASES = [
 	{ loader: "ring", size: "md", cls: "tq-loader-ring", scale: "1", cells: 0, indices: [] },
 	{ loader: "pulse", size: "sm", cls: "tq-loader-pulse", scale: "0.8", cells: 1, indices: ["0"] },
 	{ loader: "dots", size: "lg", cls: "tq-loader-dots", scale: "1.25", cells: 3, indices: ["0", "1", "2"] },
-	{ loader: "bars", size: "lg", cls: "tq-loader-bars", scale: "1.25", cells: 3, indices: ["0", "1", "2"] }
+	{ loader: "bars", size: "lg", cls: "tq-loader-bars", scale: "1.25", cells: 3, indices: ["0", "1", "2"] },
+	{ loader: "morph", size: "lg", cls: "tq-loader-morph", scale: "1.25", cells: 0, indices: [] }
 ];
 
 for (const c of CASES) {
@@ -165,19 +168,22 @@ if (statusEl.children[0] !== swapped) throw new Error("the switched icon is not 
 if (statusEl.children.indexOf(textChild) === -1) throw new Error("the status text child was lost during the switch");
 console.log(`OK   style switch swaps in place (1 icon, ${swapped.children.length} cells, text kept)`);
 
-// Every declared style must have both a rule and its keyframes in the injected CSS.
+// Every declared style must have a rule; the CSS-driven ones also need keyframes.
+// (`morph` is driven by requestAnimationFrame, so it must NOT have a CSS animation.)
 const cssEl = document.getElementById("dsh-thinking-quips-style");
 if (!cssEl) throw new Error("plugin CSS was not injected");
 const css = cssEl.textContent;
 const KEYFRAMES = { orbit: "tq-orbit-chase", ring: "tq-spin", pulse: "tq-pulse", dots: "tq-dots", bars: "tq-bars" };
-for (const [style, anim] of Object.entries(KEYFRAMES)) {
+for (const style of api.LOADER_STYLES) {
 	if (css.indexOf(`.tq-loader-${style}`) === -1) throw new Error(`CSS missing .tq-loader-${style}`);
+}
+for (const [style, anim] of Object.entries(KEYFRAMES)) {
 	if (css.indexOf(`@keyframes ${anim}`) === -1) throw new Error(`CSS missing @keyframes ${anim}`);
 	if (css.indexOf(`animation:${anim}`) === -1) throw new Error(`.tq-loader-${style} does not use ${anim}`);
 }
 if (css.indexOf("prefers-reduced-motion") === -1) throw new Error("CSS does not respect prefers-reduced-motion");
 if (css.indexOf(".tq-loader{") === -1) throw new Error("CSS missing the shared .tq-loader base rule");
-console.log(`OK   CSS covers 5 styles + keyframes + reduced motion (${css.length} bytes)`);
+console.log(`OK   CSS covers ${api.LOADER_STYLES.length} styles + keyframes + reduced motion (${css.length} bytes)`);
 
 // The ring must be REAL SVG geometry, not CSS borders: `border-radius:50%` with
 // per-side colours meets at mitred corners, which read as a rounded square at 16px
@@ -223,5 +229,27 @@ if (rule("@media (prefers-reduced-motion:reduce)").indexOf(".tq-loader svg{anima
 	throw new Error("reduced motion does not stop the ring");
 }
 console.log("OK   ring CSS = stroked track (20%) + round-capped dash arc + reduced-motion stop");
+
+// The morph: one SVG path (rewritten per frame by JS, so no CSS animation may
+// fight its transform attribute).
+const morphSpan = applyWith("morph", "md");
+const morphSvg = morphSpan.children[0];
+if (!morphSvg || morphSvg.tagName !== "svg") throw new Error("the morph does not build an <svg>");
+if (morphSvg.getAttribute("viewBox") !== "0 0 16 16") throw new Error(`morph viewBox is ${morphSvg.getAttribute("viewBox")}`);
+const morphPathEl = morphSvg.children[0];
+if (!morphPathEl || morphPathEl.tagName !== "path") throw new Error("the morph has no <path>");
+if (morphPathEl.getAttribute("class") !== "tq-morphPath") throw new Error(`unexpected morph path class: ${morphPathEl.getAttribute("class")}`);
+const stillD = morphPathEl.getAttribute("d");
+if (!/^M/.test(stillD) || !/Z$/.test(stillD)) throw new Error("the still frame is not a closed path");
+if (stillD.indexOf("L") === -1) throw new Error("the still frame has no line segments");
+const morphSvgCss = rule(".tq-loader-morph svg");
+const morphPathCss = rule(".tq-loader-morph .tq-morphPath");
+if (/animation:/.test(morphSvgCss) || /animation:/.test(morphPathCss)) {
+	throw new Error("the morph must not have a CSS animation — it would fight the JS transform");
+}
+if (!/overflow:visible/.test(morphSvgCss)) throw new Error("morph svg would clip its own stroke");
+if (!/fill:none/.test(morphPathCss) || !/stroke:currentColor/.test(morphPathCss)) throw new Error(`morph path is not stroked: ${morphPathCss}`);
+if (!/stroke-width:2/.test(morphPathCss) || !/stroke-linejoin:round/.test(morphPathCss)) throw new Error("morph path stroke is not the ring's 2px round-joined stroke");
+console.log("OK   morph = one stroked <path> in a 16x16 svg, no CSS animation");
 
 console.log("ALL LOADER CHECKS PASSED");

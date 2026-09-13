@@ -39,7 +39,7 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Elapsed-progress ring** — the ring fills as the turn runs, so the indicator
       carries information, not just motion.
 
-## 0.4.0 — Theme & languages (current)
+## 0.4.0 — Theme & languages
 
 - [x] **Match theme** — one button reads the active theme's accent off the live DOM
       (`--dsw-alias-link` → `--dsw-alias-state-business-primary` →
@@ -51,6 +51,17 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Generalize the `# <language>` sections** beyond Chinese / English: any
       `# <name>` header becomes a selectable section, and "Follow UI" maps the DSH
       locale onto it.
+
+## 0.5.0 — Shape morph indicator (current)
+
+- [x] **Shape morph** — one SVG outline that becomes a circle → a rounded triangle
+      → a rounded square → a circle, turning with a quintic ease so the rotation
+      lags the shape and settles into each one. The geometry (rounded-polygon
+      radial profiles, the blend, the path builder, both easings) is pure and
+      unit-tested; the frame loop stops itself when the indicator leaves the DOM,
+      and reduced-motion keeps a static circle.
+- [ ] **Morph speed** — expose the cycle time (today a fixed 3.3 s), and a
+      no-rotation variant for anyone who wants the shape change on its own.
 
 ## Later / considered
 
