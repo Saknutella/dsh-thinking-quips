@@ -306,4 +306,25 @@ if (pendingFrames.length !== 0) throw new Error("a detached indicator kept the l
 console.log("OK   a detached indicator stops the loop");
 Date.now = realNow;
 
+// Changing ONLY the size used to be swallowed by the "style already matches" early
+// return, so the settings size had no effect until the style changed.
+console.log("\n── a size-only change rescales the live icon ──");
+applyWith("orbit", "sm");
+const beforeResize = statusEl.children.find((c) => (c._classes || []).includes("tq-loader"));
+if (beforeResize.style.props["--tq-loader-scale"] !== "0.8") throw new Error(`expected the sm scale first, got ${beforeResize.style.props["--tq-loader-scale"]}`);
+const afterResize = applyWith("orbit", "lg", true); // same status element, same style, bigger size
+if (afterResize !== beforeResize) throw new Error("a size-only change rebuilt the icon instead of rescaling it");
+if (afterResize.style.props["--tq-loader-scale"] !== "1.25") {
+	throw new Error(`the size change did not rescale the icon: --tq-loader-scale=${afterResize.style.props["--tq-loader-scale"]}`);
+}
+if (afterResize.getAttribute("data-scale") !== "1.25") throw new Error("data-scale was not updated with the size");
+console.log("OK   size-only change rescales in place (sm 0.8 → lg 1.25, same element)");
+
+// ...and a style change still rebuilds, carrying the new size with it.
+const swappedBoth = applyWith("dots", "lg", true);
+if (swappedBoth === afterResize) throw new Error("a style change did not rebuild the icon");
+if (!swappedBoth._classes.includes("tq-loader-dots")) throw new Error("the rebuilt icon has the wrong style");
+if (swappedBoth.style.props["--tq-loader-scale"] !== "1.25") throw new Error("the rebuilt icon lost the size");
+console.log("OK   style change rebuilds and keeps the size");
+
 console.log("ALL LOADER CHECKS PASSED");
