@@ -68,6 +68,8 @@ packages are **not** modified.
 8. **Indicator-only mode** — inject only the icon and leave the status text alone,
    so the plugin can coexist with another status-text plugin instead of replacing it.
 
+![The six loading icons, and status lines rotating through the shipped quips](assets/preview-gallery.png)
+
 All of it lives in **Settings → General → Playful quips**.
 
 > **Requires DSH >= 0.1.2-rc.1** (the web surface). Config lives in `localStorage` —
