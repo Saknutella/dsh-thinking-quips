@@ -144,6 +144,28 @@ for (let seg = 0; seg < ORDER.length; seg++) {
 }
 ok("nothing outgrows the shared footprint", worstPivotRadius <= api.MORPH_RADIUS + 0.05, `max pivot radius ${worstPivotRadius.toFixed(3)} (${api.MORPH_RADIUS} allowed)`);
 
+console.log("\n── frame derivation (the clock bug) ──");
+// morphFrame() is the ONLY thing the rAF loops call, so it has to survive any clock
+// value: the preview driver once subtracted a Date.now() origin from a
+// requestAnimationFrame timestamp, got a huge negative elapsed, and froze on frame 0.
+ok("frame 0 is the circle at 0°", (() => {
+	const f = api.morphFrame(0);
+	return f.segment === 0 && f.progress === 0 && f.rotation === "rotate(0.00 8 8)";
+})(), JSON.stringify(api.morphFrame(0).segment));
+let frameProblems = 0;
+for (const ms of [-1e12, -3300, -1, 0, 1, 550, 1100, 2199, 3300, 3301, 1e9, NaN]) {
+	const f = api.morphFrame(ms);
+	if (typeof f.d !== "string" || f.d.indexOf("M") !== 0 || f.d.indexOf("NaN") !== -1) frameProblems++;
+	if (!(f.segment >= 0 && f.segment < ORDER.length)) frameProblems++;
+	if (!(f.progress >= 0 && f.progress < 1.0000001)) frameProblems++;
+	if (f.rotation.indexOf("NaN") !== -1) frameProblems++;
+}
+ok("every elapsed value (negative, NaN, past a cycle) yields a sane frame", frameProblems === 0, `${frameProblems} bad frames`);
+ok("elapsed wraps: 3300ms is the same frame as 0ms", api.morphFrame(3300).d === api.morphFrame(0).d);
+ok("negative elapsed still animates (no freeze)", api.morphFrame(-1000).d !== api.morphFrame(-2000).d);
+ok("the cycle visits all three segments", [0, 1, 2].every((s) => api.morphFrame(s * (api.MORPH_CYCLE_MS / 3) + 5).segment === s),
+	[0, 1, 2].map((s) => api.morphFrame(s * (api.MORPH_CYCLE_MS / 3) + 5).segment).join(","));
+
 console.log("\n── motion quality ──");
 // No frame may jump: sample the cycle finely and measure how far any point moves.
 let worstStep = 0;

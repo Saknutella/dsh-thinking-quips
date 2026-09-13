@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.5.1` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.5.2` · a **DSH bundle** (install-and-go) · web client plugin
 
 A standalone **DeepSeek Harness client plugin** that rotates playful status quips
 through the running-turn indicator — the line the conversation shows while the
