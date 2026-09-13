@@ -47,13 +47,20 @@ console.log("── profiles ──");
 const circle = api.morphProfile("circle");
 const triangle = api.morphProfile("triangle");
 const square = api.morphProfile("square");
+/** Profile → the points it draws, in the same frame morphPath() uses. */
+const profilePoints = (prof) => prof.map((r, i) => {
+	const a = (i / api.MORPH_SAMPLES) * Math.PI * 2 - Math.PI / 2;
+	return [Math.cos(a) * r, Math.sin(a) * r];
+});
 ok("circle is a circle", spread(circle) < 1e-9, `spread ${spread(circle)}`);
 for (const [name, prof, corners] of [["triangle", triangle, 3], ["square", square, 4]]) {
 	ok(`${name}: normalised`, Math.abs(Math.max(...prof) - 1) < 1e-9);
-	ok(`${name}: symmetric (${corners}-fold)`, (() => {
-		const step = api.MORPH_SAMPLES / corners;
+	// The shapes are mirror-symmetric about 12 o'clock (a box-centred polygon is no
+	// longer N-fold symmetric about the origin — the centring shift moves its centre
+	// of mass off the pivot, which is exactly the point of the change).
+	ok(`${name}: mirror-symmetric about 12 o'clock (${corners} corners)`, (() => {
 		for (let i = 0; i < api.MORPH_SAMPLES; i++) {
-			if (Math.abs(prof[i] - prof[(i + step) % api.MORPH_SAMPLES]) > 1e-9) return false;
+			if (Math.abs(prof[i] - prof[(api.MORPH_SAMPLES - i) % api.MORPH_SAMPLES]) > 1e-9) return false;
 		}
 		return true;
 	})());
@@ -63,10 +70,21 @@ ok("triangle and square are visibly different shapes",
 	spread(triangle.map((r, i) => Math.abs(r - square[i]))) > 0.05,
 	`max profile difference ${Math.max(...triangle.map((r, i) => Math.abs(r - square[i]))).toFixed(3)}`);
 ok("triangle points up (a corner at 12 o'clock)", (() => {
-	const i = 0; // sample 0 is 12 o'clock (a = -pi/2)
-	const corner = triangle[i] > triangle[i + 2] && triangle[i] > triangle[i + api.MORPH_SAMPLES / 3 - 2];
-	return triangle[i] >= Math.max(...triangle) - 1e-9;
+	const pts = profilePoints(triangle);
+	return Math.abs(pts[0][1] - Math.min(...pts.map((p) => p[1]))) < 1e-9;
 })(), `r(12h)=${triangle[0].toFixed(3)}`);
+
+// The centre the user sees: every shape must sit on the SAME centre (its bounding
+// box centre), otherwise the morph drifts upward as the triangle appears.
+console.log("\n── shared centre (bounding box) ──");
+for (const [name, prof] of [["circle", circle], ["triangle", triangle], ["square", square]]) {
+	const pts = profilePoints(prof);
+	const xs = pts.map((p) => p[0]);
+	const ys = pts.map((p) => p[1]);
+	ok(`${name}: bounding box is centred on the origin`,
+		Math.abs((Math.min(...xs) + Math.max(...xs)) / 2) < 1e-9 && Math.abs((Math.min(...ys) + Math.max(...ys)) / 2) < 1e-9,
+		`x centre ${((Math.min(...xs) + Math.max(...xs)) / 2).toFixed(6)}, y centre ${((Math.min(...ys) + Math.max(...ys)) / 2).toFixed(6)}`);
+}
 
 console.log("\n── easing ──");
 ok("morphEase(0)=0", Math.abs(api.morphEase(0)) < 1e-12);
@@ -98,6 +116,33 @@ for (let seg = 0; seg < ORDER.length; seg++) {
 	ok(`segment ${seg}: stays inside the 16x16 box`, Math.max(...radii) <= 7.5 + 1e-6, `max radius ${Math.max(...radii).toFixed(3)}`);
 	ok(`segment ${seg}: uses the full footprint`, Math.abs(Math.max(...radii) - api.MORPH_RADIUS) < 0.02, `max radius ${Math.max(...radii).toFixed(3)}`);
 }
+
+console.log("\n── every frame keeps the shared centre ──");
+// Strongest form of the requirement: at ANY point of the cycle the drawn outline's
+// bounding box must be centred on (8, 8) — the rotation pivot — so the shape morphs
+// and spins in place instead of wandering.
+let worstCentre = 0;
+let worstCentreAt = 0;
+for (let seg = 0; seg < ORDER.length; seg++) {
+	for (let i = 0; i <= 40; i++) {
+		const pts = points(api.morphPath(seg, i / 40));
+		const xs = pts.map((p) => p[0]);
+		const ys = pts.map((p) => p[1]);
+		const off = Math.max(Math.abs((Math.min(...xs) + Math.max(...xs)) / 2 - 8), Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - 8));
+		if (off > worstCentre) { worstCentre = off; worstCentreAt = seg + i / 40; }
+	}
+}
+ok("outline stays centred on the pivot at every phase", worstCentre < 0.01, `worst offset ${worstCentre.toFixed(5)} units at cycle point ${worstCentreAt.toFixed(2)}`);
+
+let worstPivotRadius = 0;
+for (let seg = 0; seg < ORDER.length; seg++) {
+	for (let i = 0; i <= 40; i++) {
+		for (const p of points(api.morphPath(seg, i / 40))) {
+			worstPivotRadius = Math.max(worstPivotRadius, Math.hypot(p[0] - 8, p[1] - 8));
+		}
+	}
+}
+ok("nothing outgrows the shared footprint", worstPivotRadius <= api.MORPH_RADIUS + 0.05, `max pivot radius ${worstPivotRadius.toFixed(3)} (${api.MORPH_RADIUS} allowed)`);
 
 console.log("\n── motion quality ──");
 // No frame may jump: sample the cycle finely and measure how far any point moves.

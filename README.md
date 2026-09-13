@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.5.0` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.5.1` · a **DSH bundle** (install-and-go) · web client plugin
 
 A standalone **DeepSeek Harness client plugin** that rotates playful status quips
 through the running-turn indicator — the line the conversation shows while the
@@ -22,7 +22,7 @@ by hand or matched to the active theme in one click. Stock DSH packages are
    | --- | --- |
    | **Dot orbit** *(default)* | a 3×3 dot grid where the 8 outer dots chase clockwise — each lights up and fades with a trailing tail — while the center stays empty |
    | **Spinner ring** | a real SVG circle: a faint full track with a bright round-capped arc sweeping around it |
-   | **Shape morph** | one outline that becomes a circle → a rounded triangle → a rounded square → a circle again, turning with an eased lag so it settles into each shape |
+   | **Shape morph** | one outline that becomes a circle → a rounded triangle → a rounded square → a circle again — all three sharing one centre, so it changes in place — while turning with an eased lag that settles into each shape |
    | **Pulse** | a single dot breathing in and out |
    | **Bouncing dots** | three dots bouncing in sequence |
    | **Equalizer bars** | three bars scaling from the baseline |
