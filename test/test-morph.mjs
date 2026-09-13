@@ -41,6 +41,8 @@ function points(d) {
 	return pts;
 }
 const radiusOf = (p) => Math.hypot(p[0] - 8, p[1] - 8);
+const maxRadius = (d) => Math.max(...points(d).map(radiusOf));
+const minRadius = (d) => Math.min(...points(d).map(radiusOf));
 const spread = (arr) => Math.max(...arr) - Math.min(...arr);
 
 console.log("── profiles ──");
@@ -119,30 +121,41 @@ for (let seg = 0; seg < ORDER.length; seg++) {
 
 console.log("\n── every frame keeps the shared centre ──");
 // Strongest form of the requirement: at ANY point of the cycle the drawn outline's
-// bounding box must be centred on (8, 8) — the rotation pivot — so the shape morphs
-// and spins in place instead of wandering.
+// bounding box must be centred on (8, 8) — the pivot — so the shape morphs and spins
+// in place. The rotation is baked into the coordinates rather than applied as a
+// transform, so this is read straight off the path data.
 let worstCentre = 0;
 let worstCentreAt = 0;
 for (let seg = 0; seg < ORDER.length; seg++) {
 	for (let i = 0; i <= 40; i++) {
-		const pts = points(api.morphPath(seg, i / 40));
+		const pts = points(api.morphPath(seg, i / 40, 137.5)); // an angle that is nobody's multiple
 		const xs = pts.map((p) => p[0]);
 		const ys = pts.map((p) => p[1]);
 		const off = Math.max(Math.abs((Math.min(...xs) + Math.max(...xs)) / 2 - 8), Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - 8));
 		if (off > worstCentre) { worstCentre = off; worstCentreAt = seg + i / 40; }
 	}
 }
-ok("outline stays centred on the pivot at every phase", worstCentre < 0.01, `worst offset ${worstCentre.toFixed(5)} units at cycle point ${worstCentreAt.toFixed(2)}`);
+ok("a rotated outline stays centred on the pivot", worstCentre < 0.01, `worst offset ${worstCentre.toFixed(5)} units at cycle point ${worstCentreAt.toFixed(2)}`);
 
+// The real frames of the whole cycle, rotations included, must stay centred too.
+let worstCycleCentre = 0;
 let worstPivotRadius = 0;
-for (let seg = 0; seg < ORDER.length; seg++) {
-	for (let i = 0; i <= 40; i++) {
-		for (const p of points(api.morphPath(seg, i / 40))) {
-			worstPivotRadius = Math.max(worstPivotRadius, Math.hypot(p[0] - 8, p[1] - 8));
-		}
-	}
+let cycleFrames = 0;
+for (let ms = 0; ms < api.MORPH_CYCLE_MS; ms += 25) {
+	cycleFrames++;
+	const pts = points(api.morphFrame(ms).d);
+	const xs = pts.map((p) => p[0]);
+	const ys = pts.map((p) => p[1]);
+	worstCycleCentre = Math.max(worstCycleCentre, Math.abs((Math.min(...xs) + Math.max(...xs)) / 2 - 8), Math.abs((Math.min(...ys) + Math.max(...ys)) / 2 - 8));
+	for (const p of pts) worstPivotRadius = Math.max(worstPivotRadius, Math.hypot(p[0] - 8, p[1] - 8));
 }
-ok("nothing outgrows the shared footprint", worstPivotRadius <= api.MORPH_RADIUS + 0.05, `max pivot radius ${worstPivotRadius.toFixed(3)} (${api.MORPH_RADIUS} allowed)`);
+ok("...and every real frame of the cycle, rotation included", worstCycleCentre < 0.01, `worst offset ${worstCycleCentre.toFixed(5)} units over ${cycleFrames} frames`);
+// From the pivot the outline can reach slightly past MORPH_RADIUS: re-centring the
+// ROTATED bounding box shifts the shape a little, so a far corner ends up a few
+// percent further out at some angles. The real bound is the 16px box minus the
+// stroke's half-width (1), i.e. 7 — and 6.82 leaves the stroked outline inside it.
+ok("the stroked outline stays inside the 16x16 box", worstPivotRadius + 1 <= 8, `max pivot radius ${worstPivotRadius.toFixed(3)} + 1 stroke = ${(worstPivotRadius + 1).toFixed(3)} (box half 8)`);
+ok("the outline does not breathe noticeably while turning", worstPivotRadius <= api.MORPH_RADIUS * 1.06, `${worstPivotRadius.toFixed(3)} vs ${api.MORPH_RADIUS} (${((worstPivotRadius / api.MORPH_RADIUS - 1) * 100).toFixed(1)}%)`);
 
 console.log("\n── frame derivation (the clock bug) ──");
 // morphFrame() is the ONLY thing the rAF loops call, so it has to survive any clock
@@ -150,15 +163,19 @@ console.log("\n── frame derivation (the clock bug) ──");
 // requestAnimationFrame timestamp, got a huge negative elapsed, and froze on frame 0.
 ok("frame 0 is the circle at 0°", (() => {
 	const f = api.morphFrame(0);
-	return f.segment === 0 && f.progress === 0 && f.rotation === "rotate(0.00 8 8)";
+	return f.segment === 0 && f.progress === 0 && f.rotation === 0
+		&& f.d === api.morphPath(0, 0) && points(f.d).every((p) => Math.abs(Math.hypot(p[0] - 8, p[1] - 8) - api.MORPH_RADIUS) < 0.01);
 })(), JSON.stringify(api.morphFrame(0).segment));
+const circleFrame = api.morphFrame(0);
+ok("frame 0 really is a circle", Math.abs(maxRadius(circleFrame.d) - minRadius(circleFrame.d)) < 0.02,
+	`radii ${minRadius(circleFrame.d).toFixed(3)}..${maxRadius(circleFrame.d).toFixed(3)}`);
 let frameProblems = 0;
 for (const ms of [-1e12, -3300, -1, 0, 1, 550, 1100, 2199, 3300, 3301, 1e9, NaN]) {
 	const f = api.morphFrame(ms);
 	if (typeof f.d !== "string" || f.d.indexOf("M") !== 0 || f.d.indexOf("NaN") !== -1) frameProblems++;
 	if (!(f.segment >= 0 && f.segment < ORDER.length)) frameProblems++;
 	if (!(f.progress >= 0 && f.progress < 1.0000001)) frameProblems++;
-	if (f.rotation.indexOf("NaN") !== -1) frameProblems++;
+	if (!(f.rotation >= 0 && f.rotation <= 360)) frameProblems++;
 }
 ok("every elapsed value (negative, NaN, past a cycle) yields a sane frame", frameProblems === 0, `${frameProblems} bad frames`);
 ok("elapsed wraps: 3300ms is the same frame as 0ms", api.morphFrame(3300).d === api.morphFrame(0).d);
@@ -182,6 +199,32 @@ for (let i = 0; i < steps * ORDER.length; i++) {
 	}
 }
 ok("no frame-to-frame jump (smooth morph)", worstStep < 0.4, `worst point move ${worstStep.toFixed(3)} units at cycle point ${worstAt.toFixed(2)}`);
+
+// Same idea over the REAL frames (rotation included), plus the number that actually
+// matters for a spinning icon: its angular rate. For reference the ring does 360° in
+// 900ms ≈ 6.7°/frame at 60fps, so the morph must not be in a different league — a
+// quintic ease-in-out was tried first and hit 8.6°/frame, which reads as a snap.
+let worstReal = 0;
+let worstRealAt = 0;
+let worstDegPerFrame = 0;
+let worstDegAt = 0;
+let worstDegPerSecond = 0;
+const frameMs = 1000 / 60;
+for (let ms = 0; ms + frameMs <= api.MORPH_CYCLE_MS; ms += frameMs) {
+	const fa = api.morphFrame(ms);
+	const fb = api.morphFrame(ms + frameMs);
+	const a = points(fa.d);
+	const b = points(fb.d);
+	for (let k = 0; k < a.length; k++) {
+		const move = Math.hypot(a[k][0] - b[k][0], a[k][1] - b[k][1]);
+		if (move > worstReal) { worstReal = move; worstRealAt = ms; }
+	}
+	const deg = Math.abs(fb.rotation - fa.rotation);
+	if (deg > worstDegPerFrame) { worstDegPerFrame = deg; worstDegAt = ms; }
+	worstDegPerSecond = Math.max(worstDegPerSecond, deg * (1000 / frameMs));
+}
+ok("no jump between real 60fps frames (rotation included)", worstReal < 1.2, `worst point move ${worstReal.toFixed(3)} units at ${worstRealAt.toFixed(0)}ms`);
+ok("the turn never whips (at most ~8°/frame, the ring does 6.7°)", worstDegPerFrame < 8, `peak ${worstDegPerFrame.toFixed(2)}°/frame (${worstDegPerSecond.toFixed(0)}°/s) at ${worstDegAt.toFixed(0)}ms`);
 
 const rots = [];
 for (let seg = 0; seg < ORDER.length; seg++) {

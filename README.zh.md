@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.5.2` · **DSH bundle**（装上即用）· Web 客户端插件
+`v0.5.3` · **DSH bundle**（装上即用）· Web 客户端插件
 
 一个独立的 **DeepSeek Harness 客户端插件**：把运行中状态行（DSH 默认的 `Deep diving...` 微光）
 换成可轮换的俏皮话，并在文字左侧加一个**动态加载图标**（6 种样式、3 种尺寸）。
