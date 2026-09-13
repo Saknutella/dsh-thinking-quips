@@ -4,12 +4,15 @@
 
 `v0.5.4` · a **DSH bundle** (install-and-go) · web client plugin
 
-A standalone **DeepSeek Harness client plugin** that rotates playful status quips
-through the running-turn indicator — the line the conversation shows while the
-agent is working (DSH's default `Deep diving...` shimmer) — and puts a chasing
-loading icon in front of it (six styles, three sizes). The colors can be picked
-by hand or matched to the active theme in one click. Stock DSH packages are
-**not** modified.
+**Lightweight personalisation for the DeepSeek Harness status line.** It rotates
+playful bilingual quips through the running-turn indicator — the line the
+conversation shows while the agent is working (DSH's default `Deep diving...`
+shimmer) — puts a chasing loading icon in front of it (six styles, three sizes),
+and recolours both from a picker or from the active theme in one click.
+
+Small on purpose: **no dependencies, no build step, no config file, no network
+requests** — one hand-written client file, settings in `localStorage`, and stock DSH
+packages are **not** modified.
 
 ![Running status line: the loading icon with a quip](assets/screenshot-1.png)
 

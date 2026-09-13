@@ -1,9 +1,11 @@
 # Roadmap
 
-**Direction.** This plugin owns the **status-line loading indicator** — the small
-element in front of the turn-status text — and stays deliberately small. It is not
-trying to be a phrase engine: the text rotation is one feature, the indicator is the
-point. Everything below serves that.
+**Direction.** This plugin is **lightweight personalisation for the status line** —
+the indicator in front of the turn-status text plus the text itself, with one
+settings surface and nothing else. It stays deliberately small: no dependencies, no
+build step, no config file, no network requests. It is not trying to be a phrase
+engine — the text rotation is one feature, the indicator is the point. Everything
+below serves that.
 
 ---
 

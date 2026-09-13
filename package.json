@@ -1,7 +1,7 @@
 {
   "name": "dsh-thinking-quips",
   "version": "0.5.4",
-  "description": "Rotating playful bilingual status quips plus six configurable loading icons and one-click theme-colour matching for the DeepSeek Harness running-turn indicator. A drop-in DSH web client plugin (bundle).",
+  "description": "Lightweight personalisation for the DeepSeek Harness running-turn status line: rotating bilingual quips, six configurable loading icons and one-click theme-colour matching. A drop-in DSH web client plugin (bundle) with no dependencies and no build step.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
