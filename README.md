@@ -13,7 +13,7 @@ Incremental by design: no dependencies, no build step, no config file, no networ
 requests. One hand-written client file, settings in `localStorage`, and stock DSH
 packages are **not** modified.
 
-![Six loading icons, and status lines rotating through the shipped quips](assets/preview-gallery.png)
+![Six loading icons, status lines rotating through the shipped quips, and the shimmer vs wave text effects](assets/preview-gallery.png)
 
 ## Features
 
