@@ -75,6 +75,22 @@ globalThis.document = {
 globalThis.NodeFilter = { SHOW_TEXT: 4 };
 globalThis.setInterval = (fn) => { intervalFn = fn; return 123; };
 globalThis.clearInterval = () => {};
+// A controllable clock + a requestAnimationFrame that records the callback, so the
+// morph's frame loop can be driven step by step without a browser.
+let clock = 1_000_000;
+const realNow = Date.now;
+Date.now = () => clock;
+let pendingFrames = [];
+let rafCalls = 0;
+globalThis.requestAnimationFrame = (cb) => { rafCalls++; pendingFrames.push(cb); return rafCalls; };
+globalThis.cancelAnimationFrame = () => {};
+const runFrame = (advanceMs) => {
+	const next = pendingFrames;
+	pendingFrames = [];
+	clock += advanceMs === undefined ? 16 : advanceMs;
+	for (const cb of next) cb();
+	return next.length;
+};
 
 const reactStub = { useState: () => [0, () => {}], useEffect: () => {}, useSyncExternalStore: (_s, get) => get() };
 const jsxStub = (t, p) => ({ t, p });
@@ -251,5 +267,43 @@ if (!/overflow:visible/.test(morphSvgCss)) throw new Error("morph svg would clip
 if (!/fill:none/.test(morphPathCss) || !/stroke:currentColor/.test(morphPathCss)) throw new Error(`morph path is not stroked: ${morphPathCss}`);
 if (!/stroke-width:2/.test(morphPathCss) || !/stroke-linejoin:round/.test(morphPathCss)) throw new Error("morph path stroke is not the ring's 2px round-joined stroke");
 console.log("OK   morph = one stroked <path> in a 16x16 svg, no CSS animation");
+
+// The morph is driven by requestAnimationFrame, so nothing above would notice a
+// loop that never runs — which is exactly how the offline preview shipped twice with
+// a frozen circle. Drive the plugin's own loop here.
+console.log("\n── the morph's frame loop actually runs ──");
+pendingFrames = [];
+rafCalls = 0;
+const liveSpan = applyWith("morph", "md");
+const livePath = liveSpan.children[0].children[0];
+if (rafCalls < 1 || pendingFrames.length < 1) throw new Error("ensureMorph did not schedule a frame");
+const firstD = livePath.getAttribute("d");
+if (!/^M/.test(firstD)) throw new Error("the morph path has no d before the first frame");
+const seen = new Set([firstD]);
+for (let i = 0; i < 40; i++) {
+	runFrame(100); // 100ms per frame: a few segments' worth over the loop
+	seen.add(livePath.getAttribute("d"));
+}
+if (seen.size < 10) throw new Error(`the loop drew only ${seen.size} distinct outlines in 40 frames — it is frozen`);
+if (livePath.getAttribute("d") === null) throw new Error("the morph path lost its d");
+// Frame 0 must be the still circle the markup ships with, and later frames must not be.
+const circleD = api.morphPath(0, 0);
+if (!seen.has(circleD)) throw new Error("the loop never drew the initial circle");
+console.log(`OK   40 frames drew ${seen.size} distinct outlines`);
+if (pendingFrames.length < 1) throw new Error("the loop did not re-arm");
+console.log(`OK   the loop re-arms every frame (${pendingFrames.length} pending)`);
+
+// A frame that errors must not end the animation, and a detached span must stop it.
+pendingFrames = [];
+runFrame(100);
+const midD = livePath.getAttribute("d");
+if (midD === circleD || midD === firstD) throw new Error(`the shape is not morphing: ${midD}`);
+console.log(`OK   the shape is mid-morph after the frames (${midD.slice(0, 22)}…)`);
+pendingFrames = [];
+liveSpan.isConnected = false;
+runFrame(100);
+if (pendingFrames.length !== 0) throw new Error("a detached indicator kept the loop alive");
+console.log("OK   a detached indicator stops the loop");
+Date.now = realNow;
 
 console.log("ALL LOADER CHECKS PASSED");
