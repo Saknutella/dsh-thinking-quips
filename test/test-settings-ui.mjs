@@ -69,8 +69,8 @@ function render(node, out = []) {
 	if (node.p) render(node.p.children, out);
 	return out;
 }
-/** All buttons in the row, in tree order, as {cls, text}. */
-function buttons(cfg) {
+/** Every element in the rendered row, in tree order. */
+function nodes(cfg) {
 	factoryCount++;
 	globalThis.localStorage = {
 		getItem: () => JSON.stringify(Object.assign({}, api.DEFAULTS, cfg)),
@@ -79,12 +79,23 @@ function buttons(cfg) {
 	globalThis.window.__DSH_THINKING_QUIPS__ = false;
 	const plugin = loaded.factory(requireStub);
 	const row = plugin.__internal.QuipsSettingsRow({ t: (key) => key });
-	return render(row)
+	return render(row);
+}
+/** All buttons in the row, in tree order, as {cls, text}. */
+function buttons(cfg) {
+	return nodes(cfg)
 		.filter((node) => node.t === "button")
 		.map((node) => {
 			const props = node.p || {};
 			return { cls: String(props.className || ""), text: typeof props.children === "string" ? props.children : "" };
 		});
+}
+/** The labels of a <select>'s options, in tree order. */
+function options(cfg, selectLabel) {
+	const all = nodes(cfg);
+	const select = all.filter((node) => node.t === "select" && (node.p || {})["aria-label"] === selectLabel)[0];
+	if (select === undefined) return [];
+	return render(select.p.children).map((node) => (typeof (node.p || {}).children === "string" ? node.p.children : ""));
 }
 const texts = (list) => list.map((b) => b.text).filter((t) => t !== "");
 const has = (list, label) => texts(list).indexOf(label) !== -1;
@@ -120,6 +131,26 @@ ok("stop-follow still offered", has(row, "quips.stopFollow"), texts(row).join(",
 console.log("\n── the row always renders something ──");
 row = buttons({});
 ok("unknown config falls back to defaults", has(row, "quips.manage") && has(row, "quips.matchTheme"));
+
+console.log("\n── the elapsed-time control ──");
+row = buttons({ clockMode: "inline" });
+for (const mode of api.CLOCK_MODES) {
+	ok(`offers the "${mode}" clock mode`, find(row, "quips.clock." + mode) !== null, texts(row).join(", "));
+}
+ok("the configured mode is the active one", find(row, "quips.clock.inline").cls.indexOf("tq-segActive") !== -1);
+row = buttons({ clockMode: "separate" });
+ok("switching the mode moves the active state", find(row, "quips.clock.separate").cls.indexOf("tq-segActive") !== -1
+	&& find(row, "quips.clock.inline").cls.indexOf("tq-segActive") === -1);
+row = buttons({ clockMode: "nonsense" });
+ok("an unknown mode falls back to inline", find(row, "quips.clock.inline").cls.indexOf("tq-segActive") !== -1);
+
+console.log("\n── the text-effect control ──");
+for (const effect of api.TEXT_EFFECTS) {
+	const label = "quips.effect." + effect;
+	ok(`offers the "${effect}" effect`, options({ textEffect: "glow" }, "quips.textEffect").indexOf(label) !== -1,
+		options({ textEffect: "glow" }, "quips.textEffect").join(", "));
+}
+ok("shimmer and official are distinct labels", api.TEXT_EFFECTS.indexOf("shimmer") !== api.TEXT_EFFECTS.indexOf("official"));
 
 console.log(failures === 0 ? `\nALL SETTINGS-UI CHECKS PASSED (${factoryCount} renders)` : `\nSETTINGS-UI CHECKS FAILED: ${failures}`);
 process.exit(failures === 0 ? 0 : 1);

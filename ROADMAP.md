@@ -65,7 +65,48 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.6.0 — Text effects & one global speed (current)
+## 0.7.0 — DSH 0.2 (current)
+
+- [x] **0.2 anchor** — the running line is `[data-chat-running]` now, and the only
+      `role="status"` inside it is a screen-reader announcement clipped to 1px, so the old
+      `[class*="turnStatus"]` match (and its "Deep diving" text fallback) aimed the quips
+      at an invisible node. The plugin matches the attribute first, keeps the 0.1.x token
+      as a fallback, and never writes into the announcement.
+- [x] **Line ownership** — on 0.2 the visible label lives inside DSH's `TextShimmer` and
+      React rewrites it every second (it carries the live elapsed time), with an inert
+      decoration copy mirroring it through `data-shimmer-text`. So the plugin hides that
+      label by attribute (`data-tq-owned`) and paints its own `.tq-line` instead of
+      blanking a node React owns. DSH's whale icon is left alone: the two coexist.
+- [x] **Official shimmer via the seed** — 0.2 seeds
+      `@deepseek-ai/dsh-client-ui-primitives` for every client plugin, so `shimmer` (and
+      its alias `official`) renders DSH's own `TextShimmer` through a small React root
+      instead of reimplementing the sweep. `glow` keeps the pre-0.2 painted gradient, on
+      the plugin's own node.
+- [x] **Elapsed time** — `conversation.chat.turnTail` (official, session-scoped) is
+      mounted while the turn is open and hands over `turn.start.time`, so the clock uses
+      the official start with a self-timer fallback. Inline folds the duration into the
+      animated text (the 0.2 shape); separate renders it as a tertiary-grey note outside
+      the animation (the 0.1 shape); off hides it. The format matches DSH's
+      `formatRunDuration` (verified over 13 inputs in both locales).
+- [x] **Colour hook migration** — the pre-0.2 `background-image` surgery is replaced by
+      `--dsw-alias-label-shimmer` on the running wrapper (the official `.running` rule
+      re-maps it to its deep-diving tint), plus `--tq-base`/`--tq-hi` for the plugin's own
+      nodes.
+- [x] **Speed stays ours** — 0.2 animates its sweep on `.sweep`/`.highlight` inside a
+      component the plugin does not own, so the speed control scales only the plugin's
+      animations (0.6.1's "the official sweep keeps its own pace", now enforced by the
+      markup rather than by choice).
+- [x] **Declaration hygiene** — `@deepseek-ai/dsh-client-runtime` no longer exists in 0.2
+      (the profile still had a dangling junction for it); dropped from `dsh.client.inject`
+      and the peers, `engines.dsh` bumped to `>=0.2.0-rc.2`.
+- [ ] **Adopt more official UI** — the settings row still hand-rolls its switch,
+      segmented control and modal; `@deepseek-ai/dsh-client-ui-primitives` exports
+      `Switch`, `SegmentedControl`, `Modal`, `Toast` and `SettingsForm`.
+- [ ] **Native icon options** — offer DSH's whale / `StateDot` / `FishLogo` as loader
+      styles (the zero-copy ways to reach the whale APNG are recorded in the source
+      repository's `docs/状态行扩展调研.md`; research notes are not shipped in the npm package).
+
+## 0.6.0 — Text effects & one global speed
 
 - [x] **Text effect** — **Shimmer** (DSH's own sweep, default) or **Wave**: each CJK
       glyph / Latin word lifts in turn, left to right, staggered in pure CSS. The wave

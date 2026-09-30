@@ -302,20 +302,20 @@ if (overrideCss.textContent.indexOf(".tq-wave{color:") === -1) throw new Error(`
 console.log("OK   the colour override covers .tq-wave");
 
 // The speed is three steps (slow / normal / fast) and "normal" must leave no trace.
-// Everything the plugin animates reads the variable, and DSH's shimmer is restated
-// scaled only when the level is not normal.
+// Everything the plugin animates reads the variable. DSH's own sweep is deliberately
+// NOT scaled any more: on 0.2 it animates inside the primitives' TextShimmer, so the
+// only thing the speed may write is the variable itself.
 applyWith("orbit", "md", false, { speed: "fast" });
 if (document.documentElement.style.props["--tq-speed"] !== "2") throw new Error(`--tq-speed was not set for fast: ${JSON.stringify(document.documentElement.style.props)}`);
 const speedStyle = document.getElementById("dsh-thinking-quips-speed");
-if (!speedStyle || speedStyle.textContent.indexOf("animation-duration") === -1) throw new Error("the shimmer is not scaled at a non-normal level");
-if (speedStyle.textContent.indexOf(".tq-loader") !== -1) throw new Error("the speed override must only touch the status element");
+if (speedStyle !== null && speedStyle.textContent !== "") throw new Error(`the speed must not override DSH's shimmer any more: ${speedStyle.textContent}`);
 applyWith("orbit", "md", false, { speed: "slow" });
 if (document.documentElement.style.props["--tq-speed"] !== "0.5") throw new Error("--tq-speed was not set for slow");
 applyWith("orbit", "md", false, { speed: "normal" });
 if (document.documentElement.style.props["--tq-speed"] !== undefined) throw new Error("--tq-speed should be removed again at normal");
 const normalStyle = document.getElementById("dsh-thinking-quips-speed");
-if (normalStyle && normalStyle.textContent !== "") throw new Error("the shimmer override should be cleared at normal");
-console.log("OK   slow/normal/fast drive --tq-speed, and normal leaves nothing behind");
+if (normalStyle && normalStyle.textContent !== "") throw new Error("the speed override should be cleared at normal");
+console.log("OK   slow/normal/fast drive --tq-speed only (DSH's own sweep keeps its pace)");
 
 // The morph is driven by requestAnimationFrame, so nothing above would notice a
 // loop that never runs — which is exactly how the offline preview shipped twice with

@@ -1,7 +1,7 @@
 {
   "name": "dsh-thinking-quips",
-  "version": "0.6.2",
-  "description": "Lightweight personalisation for the DeepSeek Harness running-turn status line: rotating bilingual quips, six configurable loading icons and one-click theme-colour matching. A drop-in DSH web client plugin (bundle) with no dependencies and no build step.",
+  "version": "0.7.0",
+  "description": "Lightweight personalisation for the DeepSeek Harness running-turn status line: rotating bilingual quips, six configurable loading icons, one-click theme-colour matching and an optional elapsed-time readout. A drop-in DSH web client plugin (bundle) with no dependencies and no build step.",
   "type": "module",
   "main": "lib/index.js",
   "exports": {
@@ -23,9 +23,9 @@
     },
     "client": {
       "inject": [
-        "@deepseek-ai/dsh-client-runtime",
         "@deepseek-ai/dsh-client-locale",
-        "@deepseek-ai/dsh-client-ui-settings-general"
+        "@deepseek-ai/dsh-client-ui-settings-general",
+        "@deepseek-ai/dsh-client-ui-chat"
       ],
       "platform": "web",
       "immediately": true
@@ -55,23 +55,23 @@
     "url": "https://github.com/Saknutella/dsh-thinking-quips/issues"
   },
   "peerDependencies": {
-    "@deepseek-ai/dsh-client-runtime": "*",
     "@deepseek-ai/dsh-client-locale": "*",
-    "@deepseek-ai/dsh-client-ui-settings-general": "*"
+    "@deepseek-ai/dsh-client-ui-settings-general": "*",
+    "@deepseek-ai/dsh-client-ui-chat": "*"
   },
   "peerDependenciesMeta": {
-    "@deepseek-ai/dsh-client-runtime": {
-      "optional": true
-    },
     "@deepseek-ai/dsh-client-locale": {
       "optional": true
     },
     "@deepseek-ai/dsh-client-ui-settings-general": {
       "optional": true
+    },
+    "@deepseek-ai/dsh-client-ui-chat": {
+      "optional": true
     }
   },
   "engines": {
-    "dsh": ">=0.1.2-rc.1"
+    "dsh": ">=0.2.0-rc.2"
   },
   "license": "MIT"
 }

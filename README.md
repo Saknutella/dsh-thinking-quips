@@ -2,12 +2,13 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.6.2` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.7.0` · a **DSH bundle** (install-and-go) · web client plugin
 
 **Lightweight personalisation for the DeepSeek Harness status line** — the line the
 conversation shows while the agent is working (DSH's default `Deep diving...`).
-Rotating bilingual quips, six loading icons in three sizes, and one-click
-theme-colour matching, all in **Settings → General → Playful quips**.
+Rotating bilingual quips, six loading icons in three sizes, one-click theme-colour
+matching and an optional elapsed-time readout, all in
+**Settings → General → Playful quips**.
 
 Incremental by design: no dependencies, no build step, no config file, no network
 requests. One hand-written client file, settings in `localStorage`, and stock DSH
@@ -25,11 +26,16 @@ packages are **not** modified.
 - **Font colour** — preview swatch, hex, RGB, or the native colour wheel.
 - **Match theme** — one click fits the active theme's accent colour to a readable
   contrast, and keeps following theme switches until you stop it.
-- **Text effect** — **Shimmer** (DSH's own sideways sweep, default) or **Wave**, which
-  lifts each character (CJK) or each word (Latin) in turn, left to right.
+- **Text effect** — **Shimmer** (default: DSH's own `TextShimmer` component is
+  rendered by the plugin), **Wave** (each character/word lifts in turn) or
+  **Glow (legacy)**, which recreates the pre-0.2 look of the glyphs themselves being
+  lit by a sliding gradient.
+- **Elapsed time** — **Inline** folds the duration into the quip so it animates with
+  the text (the DSH 0.2 shape), **Beside** shows it as a separate grey note outside the
+  animation (the 0.1 shape), or turn it **off**. The time comes from DSH's own turn
+  start (`turn.start.time`) and formats exactly like the official `formatRunDuration`.
 - **Animation speed** — **Slow / Normal / Fast** in one click. Normal is the shipped
-  pace and overrides nothing; the others step every animation (including DSH's shimmer)
-  to half or double.
+  pace and overrides nothing; the others scale the plugin's own animations.
 - **Time per quip** and **glow strength**.
 - **Indicator only** — inject just the icon and leave the status text alone, so it
   can sit alongside another status-text plugin.
@@ -46,7 +52,9 @@ packages are **not** modified.
    ```
 3. Restart `dsh web`.
 
-**Requirements:** DSH ≥ 0.1.2-rc.1 (the web surface).
+**Requirements:** DSH ≥ 0.2.0-rc.2 (the web surface). On 0.2 the running line is
+`[data-chat-running]` and its label lives inside DSH's `TextShimmer`; the plugin detects
+both that shape and the older `[class*="turnStatus"]` one, so 0.1.x shells keep working.
 
 **Uninstall:** remove it from `dsh.profile.bundles`, run
 `dsh plugin --profile web remove dsh-thinking-quips`, and restart `dsh web`.
