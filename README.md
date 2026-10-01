@@ -2,12 +2,12 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.8.0` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.9.0` · a **DSH bundle** (install-and-go) · web client plugin
 
 **Lightweight personalisation for the DeepSeek Harness status line** — the line the
 conversation shows while the agent is working (DSH's default `Deep diving...`).
-Rotating bilingual quips, nine loading icons in three sizes, one-click theme-colour
-matching and an optional elapsed-time readout, all in
+Rotating bilingual quips, nine loading icons in three sizes, one-click colour presets,
+theme-colour matching that reaches 4.5:1, and an optional elapsed-time readout, all in
 **Settings → Playful quips** (its own page in the settings nav, not a row under General).
 
 Incremental by design: no dependencies, no build step, no config file, no network
@@ -28,11 +28,16 @@ packages are **not** modified.
   `# English` sections and edited in a small modal; the **Language** control picks
   which section shows (Follow UI, English only, Chinese only, or Mixed).
 - **Font colour** — preview swatch, hex, RGB, or the native colour wheel.
+- **Colour presets** — brand blue, violet, teal, amber, one click each. Every chip is fitted
+  to the background that is on screen and floored at 4.5:1, so the same chip stays legible
+  in the light *and* the dark theme, and picking one stops **Match theme** from following
+  (you named a colour). Brand blue writes the plugin's default sentinel, so "brand blue"
+  still means DSH's own default rather than an override of it.
 - **Sweep brightness** — 0–100%, how much brighter the official sweep's moving highlight is
   than the text (0% makes it the text colour, i.e. an invisible sweep; 100% is white). It
   writes the token the official `TextShimmer` paints that highlight with.
-- **Match theme** — one click fits the active theme's accent colour to a readable
-  contrast, and keeps following theme switches until you stop it.
+- **Match theme** — one click fits the active theme's accent colour to at least 4.5:1 against
+  the live background, and keeps following theme switches until you stop it.
 - **Text effect** — **Shimmer** (default: DSH's own sweep, because the plugin renders the
   official `TextShimmer` component) or **Wave** (each character/word lifts in turn). Two
   choices, not four: the hand-painted "glow" copy of the official sweep was
@@ -45,7 +50,7 @@ packages are **not** modified.
   pace and overrides nothing; the others scale the plugin's own animations. DSH's own
   whale carries its animation inside the image (a 60-frame APNG), so for that one the
   plugin adds its own swim cue at the chosen pace instead.
-- **Time per quip** and **glow strength**.
+- **Time per quip**.
 - **Indicator only** — inject just the icon and leave the status text alone, so it
   can sit alongside another status-text plugin.
 

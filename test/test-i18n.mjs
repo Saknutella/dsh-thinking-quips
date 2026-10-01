@@ -1,9 +1,48 @@
 // Dictionary guard: every key the UI asks for must exist in BOTH locales, and the
 // two dictionaries must have exactly the same key set (no zh-only / en-only drift).
-// Dynamic keys are derived from the source's own LOADER_STYLES / LOADER_SCALES, so
-// adding a loader style only requires adding its label here-compatible key.
+// Dynamic keys are derived from the source's own LOADER_STYLES / LOADER_SCALES, and
+// the colour-preset chip labels from the REAL module's __internal COLOR_PRESETS, so
+// adding a loader style or a preset only requires adding its label key.
 
 import { readFileSync } from "node:fs";
+
+// ── the shipped module, loaded for real ──────────────────────────────────────
+// WHY import it instead of only regex-scanning the source: the preset chips are
+// labelled with `t(preset.key)`, a DYNAMIC key the literal `t("...")` scan below
+// cannot see. That scan used to list quips.preset.* as "not referenced by t()"
+// notes and still exit 0 — deleting quips.preset.teal from BOTH dictionaries was
+// invisible, while DSH's locale lookup is `dict[key] ?? key`, so the settings panel
+// would show the raw string "quips.preset.teal" to the user. Enumerating
+// COLOR_PRESETS off the shipped __internal keeps this list in lock-step with the
+// implementation (no second copy of the four keys here to drift out of date).
+let loaded = null;
+globalThis.window = {
+	__ModuleLoader__: { load: (x) => { loaded = x; } },
+	__DSH_THINKING_QUIPS__: false
+};
+globalThis.document = {
+	body: { style: { setProperty() {}, removeProperty() {} }, hasAttribute: () => false, getAttribute: () => null },
+	documentElement: {},
+	getElementById: () => null,
+	createElement: () => ({ style: {}, setAttribute() {}, appendChild() {} }),
+	querySelectorAll: () => [],
+	createTreeWalker: () => ({ nextNode: () => null })
+};
+globalThis.getComputedStyle = () => ({ getPropertyValue: () => "", colorScheme: "", backgroundColor: "" });
+
+const reactStub = { useState: () => [0, () => {}], useEffect: () => {}, useRef: () => ({ current: null }), useSyncExternalStore: (_s, get) => get() };
+const jsxStub = (t, p) => ({ t, p });
+const requireStub = (name) => {
+	if (name === "react") return reactStub;
+	if (name === "react/jsx-runtime") return { jsx: jsxStub, jsxs: jsxStub };
+	throw new Error("unexpected require: " + name);
+};
+
+await import("../lib/client.js");
+if (loaded === null) throw new Error("module did not register a factory");
+const api = loaded.factory(requireStub).__internal;
+if (!api) throw new Error("plugin does not expose __internal (test seam missing)");
+if (!Array.isArray(api.COLOR_PRESETS)) throw new Error("COLOR_PRESETS is not exposed via __internal");
 
 const src = readFileSync(new URL("../lib/client.js", import.meta.url), "utf8");
 
@@ -42,6 +81,18 @@ for (const size of keysOf("LOADER_SCALES")) used.add(`quips.size.${size}`);
 for (const effect of listOf("TEXT_EFFECTS")) used.add(`quips.effect.${effect}`);
 for (const speed of listOf("SPEED_ORDER")) used.add(`quips.speed.${speed}`);
 for (const scheme of ["light", "dark"]) used.add(`quips.scheme.${scheme}`);
+// Colour-preset chip labels are dynamic (`t(preset.key)`), so they are enumerated
+// off the shipped COLOR_PRESETS rather than a hand-maintained list of four strings.
+// A missing label is shown to the user verbatim (DSH: `dict[key] ?? key`), so these
+// keys belong in `used`: the parity loop below then FAILS on them instead of merely
+// printing them as informational notes, which is exactly how the teal label could
+// be deleted from both dictionaries and still leave this file green.
+for (const preset of api.COLOR_PRESETS) {
+	if (!preset || typeof preset.key !== "string" || preset.key === "") {
+		throw new Error(`COLOR_PRESETS entry without a display-name key: ${JSON.stringify(preset)}`);
+	}
+	used.add(preset.key);
+}
 
 let bad = 0;
 const report = (line) => { console.log(line); bad++; };

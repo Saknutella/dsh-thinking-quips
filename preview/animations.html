@@ -322,6 +322,28 @@ window.__ModuleLoader__.load({
 		*/
 		const DEFAULT_GLOW = 35;
 		/**
+		* The one-click colour presets (ROADMAP 0.4.0: "brand blue / violet / teal / amber,
+		* one click each").
+		*
+		* Each entry carries the raw colour it is named after and the dictionary key for its
+		* label; the colour a click actually writes is fitted per theme first (see
+		* {@link presetPatch}/{@link presetColor}), so a preset can never land below
+		* {@link MIN_CONTRAST} just because the app is dark or a third-party theme is grey.
+		* The `key` is spelled out rather than derived from `id` so this table is the single
+		* description of a preset and the self-check can assert the two never drift.
+		*
+		* WHY these four hues: brand blue is the plugin's own shipped default, and the other
+		* three sit well away from it and from each other on the wheel (measured hues: 225.5°
+		* / 271.5° / 174.1° / 37.3°), so the four chips read as four different colours at a
+		* glance instead of four shades of blue.
+		*/
+		const COLOR_PRESETS = [
+			{ id: "blue", base: DEFAULT_BLUE, key: "quips.preset.blue" },
+			{ id: "violet", base: "#9333EA", key: "quips.preset.violet" },
+			{ id: "teal", base: "#0E9C8E", key: "quips.preset.teal" },
+			{ id: "amber", base: "#C47A00", key: "quips.preset.amber" }
+		];
+		/**
 		* Selectable loader indicators (the plugin's differentiator).
 		*
 		* Six are drawn by the plugin itself. The last three reuse what DSH already ships,
@@ -930,6 +952,126 @@ window.__ModuleLoader__.load({
 			return out;
 		}
 		/**
+		* Make a colour readable on a background, in the one case {@link fitToTheme} cannot
+		* promise it.
+		*
+		* WHY this exists next to the fit: the fit's lightness band is a LOOK, and it can stop
+		* with the ratio still short. Two measured cases from the shipped preset table:
+		* fitToTheme("#0E9C8E", "#ffffff") returns #0e978a, which is 3.61:1 on white — under
+		* WCAG AA for a colour the user is about to read in the common (light) theme — and on a
+		* mid-tone background (`#808080`, what an unstyled or third-party theme can produce) the
+		* fit even picks the wrong direction: fitToTheme("#C47A00", "#808080") returns #fcdfb1 at
+		* 3.07:1, because neither band is right when the background is neither light nor dark.
+		*
+		* So this tries pushing lightness away from the background first (down on a light app,
+		* up on a dark one) and then the other way, keeping the hue and saturation throughout,
+		* so the colour is still the preset the user picked. Pure black/white is the last
+		* resort: black and white are equal at 4.58:1 and one of the two is always above that,
+		* so the fallback itself cannot miss {@link MIN_CONTRAST}.
+		* @param hex - a colour already fitted for `bg`.
+		* @param bg - the background it will be painted on.
+		* @returns `#rrggbb` with contrast >= {@link MIN_CONTRAST} against `bg`.
+		*/
+		function readableOn(hex, bg) {
+			const background = hexToRgb(bg) ? bg : "#ffffff";
+			const extreme = () => (contrastRatio("#000000", background) >= contrastRatio("#ffffff", background) ? "#000000" : "#ffffff");
+			const hsl = rgbToHsl(hex);
+			if (!hsl) return extreme();
+			const away = relativeLuminance(background) < 0.4 ? 1 : -1;
+			for (const step of [away, -away]) {
+				let level = hsl.l;
+				let out = hex;
+				let guard = 0;
+				while (contrastRatio(out, background) < MIN_CONTRAST && guard < 101) {
+					const next = level + step;
+					if (next < 0 || next > 100) break;
+					level = next;
+					out = hslToHex(hsl.h, hsl.s, level);
+					guard++;
+				}
+				if (contrastRatio(out, background) >= MIN_CONTRAST) return out;
+			}
+			return extreme();
+		}
+		/**
+		* Look a preset up by id.
+		* @param id - the preset id.
+		* @returns the preset entry, or null (an unknown id from stale storage must not throw).
+		*/
+		function colorPreset(id) {
+			for (const preset of COLOR_PRESETS) if (preset.id === id) return preset;
+			return null;
+		}
+		/**
+		* The colour one preset stands for on a given background: its own hue, fitted to the
+		* live background and then floored at {@link MIN_CONTRAST}.
+		*
+		* WHY not store the raw hex: the same chip has to be legible in the light AND the
+		* dark theme, and a vivid amber that is fine on a dark app is nearly invisible on a
+		* white one. Fitting at click time (against the background that is on screen) is the
+		* same mechanism the "Match theme" button already uses, so a preset lands inside the
+		* existing colour pipeline instead of beside it.
+		* @param id - the preset id.
+		* @param bg - the app background to fit against.
+		* @returns `#rrggbb`, or null for an unknown id.
+		*/
+		function presetColor(id, bg) {
+			const preset = colorPreset(id);
+			if (!preset) return null;
+			const background = hexToRgb(bg) ? bg : "#ffffff";
+			return readableOn(fitToTheme(preset.base, background), background);
+		}
+		/**
+		* The config patch one preset click applies.
+		*
+		* WHY brand blue writes the `shimmer` sentinel instead of a hex: in this plugin
+		* `shimmer` IS the brand blue — it is what {@link DEFAULTS}.color ships, what the
+		* "Back to brand blue" button and "Reset to default" both write, and the only value
+		* that leaves DSH's own `TextShimmer` and its theme token untouched. Writing a fitted
+		* hex there would quietly turn the default into an override: the line would stop
+		* tracking DSH's own accent, and the "Back to brand blue" button would appear right
+		* after the user pressed the button that is supposed to mean "brand blue". The other
+		* three presets are genuinely new colours, so they do write their fitted hex.
+		*
+		* WHY `colorTheme: false` on every preset: a preset is the user naming a colour, and
+		* that is the same act as typing a hex or moving the wheel, which already stops the
+		* "Match theme" follow. A preset that stayed on follow would be overwritten by the
+		* next theme switch, i.e. the click would do nothing visible.
+		* @param id - the preset id.
+		* @param bg - the app background to fit against.
+		* @returns a config patch, or null for an unknown id.
+		*/
+		function presetPatch(id, bg) {
+			const preset = colorPreset(id);
+			if (!preset) return null;
+			if (preset.id === "blue") return { color: SHIMMER, colorTheme: false };
+			const color = presetColor(preset.id, bg);
+			return color === null ? null : { color, colorTheme: false };
+		}
+		/**
+		* Whether a preset is the one currently in force, so its chip can show it.
+		*
+		* Matched against the preset's raw base AND its fitted colour, because both are
+		* legitimate saved values: a user can type the base hex by hand, and a colour saved
+		* under a light theme keeps its light-theme value after the app switches to dark
+		* (that is exactly what "not following the theme" means). The brand-blue preset also
+		* matches the `shimmer` sentinel, which is what its own click writes.
+		* @param id - the preset id.
+		* @param color - the configured colour (the `shimmer` sentinel or a `#rrggbb`).
+		* @param bg - the background the fitted colour is compared against.
+		* @returns true when the chip should render as selected.
+		*/
+		function presetActive(id, color, bg) {
+			const preset = colorPreset(id);
+			if (!preset) return false;
+			const isSentinel = color === SHIMMER || !color;
+			if (preset.id === "blue" && isSentinel) return true;
+			const current = parseCssColor(color);
+			if (current === null) return false;
+			const fitted = presetColor(preset.id, bg);
+			return current === parseCssColor(preset.base) || (fitted !== null && current === fitted);
+		}
+		/**
 		* Read the active theme's accent colour from the live DOM (never from our own
 		* override, which the caller avoids by reading tokens rather than the shimmer).
 		* @param node - element inside the app to inherit theme tokens from.
@@ -947,13 +1089,28 @@ window.__ModuleLoader__.load({
 		/**
 		* The "match theme colour" result: the extracted accent plus the fitted colour
 		* and the numbers the settings row reports.
+		*
+		* WHY the extra {@link readableOn} step after the fit: the fit's lightness band is a
+		* LOOK, and it stops at the band edge even when the ratio is still short — so this
+		* function used to hand back a colour below the {@link MIN_CONTRAST} it prints right
+		* next to it. Two measured cases: fitToTheme("#0E9C8E", "#ffffff") = #0e978a (3.61:1),
+		* and on backgrounds whose luminance falls between 0.18333 and the fit's 0.4
+		* dark/light threshold the fit lightens an accent that can only be saved by darkening,
+		* so all 3456 sampled accent/background pairs there missed AA (100%). The follow
+		* observer writes this colour into the saved config and the settings page shows it to
+		* the user, so the miss was user-visible, not cosmetic.
+		*
+		* That floor is the same one the colour presets use ({@link presetColor}), which is the
+		* point: the two entry points into the colour pipeline now make one promise, not two.
+		* The fit itself is deliberately left alone — its band is the existing look, and it is
+		* pinned by this plugin's own self-check.
 		* @param node - element inside the app to inherit theme tokens from.
 		* @returns `{ raw, token, bg, scheme, color, contrast, fallback }`.
 		*/
 		function matchThemeColor(node) {
 			const info = themeColor(node);
 			const source = info.raw || DEFAULT_BLUE;
-			const color = fitToTheme(source, info.bg);
+			const color = readableOn(fitToTheme(source, info.bg), info.bg);
 			return {
 				raw: info.raw,
 				token: info.token,
@@ -2528,6 +2685,15 @@ window.__ModuleLoader__.load({
 			".tq-colorBlock{flex-direction:column;gap:8px;display:flex}",
 			".tq-themeNote{color:var(--dsw-alias-label-tertiary);font-size:12px;line-height:18px;font-variant-numeric:tabular-nums;word-break:break-word}",
 			".tq-swatch{width:46px;height:30px;border-radius:8px;flex:none;border:1px solid var(--dsw-alias-border-l2);background-color:#000;background-size:250% 100%;cursor:pointer}",
+			// One-click colour presets: the same pill language as `.tq-btn`, plus a round chip
+			// painted with the colour the click would actually write (see presetColor). The
+			// selected chip uses the accent tokens `.tq-btnOn` already uses, so "selected" reads
+			// the same here as it does on the Match-theme button.
+			".tq-presets{align-items:center;gap:8px;display:flex;flex-wrap:wrap}",
+			".tq-preset{align-items:center;gap:8px;background:var(--dsw-alias-interactive-bg-hover-solid);color:var(--dsw-alias-label-primary);cursor:pointer;border:1px solid transparent;border-radius:18px;height:36px;padding:0 12px;font:inherit;font-size:13px;line-height:18px;display:inline-flex}",
+			".tq-preset:hover{background:var(--dsw-alias-interactive-bg-hover)}",
+			".tq-presetOn{background:var(--dsw-alias-interactive-bg-hover-accent);border-color:var(--dsw-alias-state-business-primary);color:var(--dsw-alias-state-business-primary)}",
+			".tq-presetChip{width:16px;height:16px;flex:none;border-radius:50%;border:1px solid var(--dsw-alias-border-l2)}",
 			".tq-inputs{align-items:center;gap:8px;display:flex;flex-wrap:wrap}",
 			".tq-input{background:var(--dsw-alias-bg-module-platform);color:var(--dsw-alias-label-primary);border:1px solid var(--dsw-alias-border-l2);border-radius:8px;padding:5px 8px;font:inherit;font-size:13px;line-height:18px}",
 			".tq-input[type=number]{width:56px}",
@@ -2757,6 +2923,12 @@ window.__ModuleLoader__.load({
 			"quips.matched": "已匹配主题色",
 			"quips.matchFallback": "读不到主题色，已按品牌蓝适配",
 			"quips.contrast": "对比度",
+			"quips.presets": "颜色预设",
+			"quips.presetsHint": "一键切换颜色；色板按当前背景实测调整到对比度不低于 4.5:1，选中后不再跟随主题。",
+			"quips.preset.blue": "品牌蓝",
+			"quips.preset.violet": "紫罗兰",
+			"quips.preset.teal": "青碧",
+			"quips.preset.amber": "琥珀",
 			"quips.following": "跟随主题中",
 			"quips.stopFollow": "取消跟随",
 			"quips.stopFollowTitle": "保留当前颜色，但不再随主题切换而变化",
@@ -2825,6 +2997,12 @@ window.__ModuleLoader__.load({
 			"quips.matched": "Matched theme color",
 			"quips.matchFallback": "No theme color found — fitted the brand blue instead",
 			"quips.contrast": "contrast",
+			"quips.presets": "Color presets",
+			"quips.presetsHint": "One click per colour; each chip is fitted to the current background for at least 4.5:1 contrast and stops following the theme.",
+			"quips.preset.blue": "Brand blue",
+			"quips.preset.violet": "Violet",
+			"quips.preset.teal": "Teal",
+			"quips.preset.amber": "Amber",
 			"quips.following": "Following theme",
 			"quips.stopFollow": "Stop following",
 			"quips.stopFollowTitle": "Keep the current color but stop tracking theme switches",
@@ -3063,6 +3241,10 @@ window.__ModuleLoader__.load({
 			const clockMode = CLOCK_MODES.indexOf(cfg.clockMode) !== -1 ? cfg.clockMode : "inline";
 			const surface = SURFACES.indexOf(runtime && runtime.surface) !== -1 ? runtime.surface : "web";
 			const platform = (runtime && runtime.platform) || "unknown";
+			// The background the preset chips are fitted to, read once per render. It has to be
+			// re-read rather than remembered: a theme switch re-renders this page, and the chips
+			// must then show the colours a click would write under the NEW background.
+			const presetsBg = themeBackground(null);
 			return jsxs("div", { className: "tq-page", children: [
 				jsxs("div", { className: "tq-head", children: [
 					jsxs("div", { className: "tq-headText", children: [
@@ -3077,6 +3259,38 @@ window.__ModuleLoader__.load({
 				jsxs("div", { className: "tq-headText", children: [
 					jsx("div", { className: "tq-title", children: t("quips.color") }),
 					jsx("div", { className: "tq-desc", children: t("quips.colorDesc") })
+				] }),
+				// The one-click colour presets. They sit above the wheel and the hex fields
+				// because they are the short path and those are the long one; the row is skipped
+				// entirely when the table is empty, so a trimmed build cannot render an empty box.
+				COLOR_PRESETS.length === 0 ? null : jsxs("div", { className: "tq-colorBlock", children: [
+					jsx("div", {
+						className: "tq-presets",
+						role: "group",
+						"aria-label": t("quips.presets"),
+						children: COLOR_PRESETS.map((preset) => {
+							const active = presetActive(preset.id, cfg.color, presetsBg);
+							const chip = presetColor(preset.id, presetsBg);
+							return jsx("button", {
+								type: "button",
+								className: "tq-preset" + (active ? " tq-presetOn" : ""),
+								"aria-pressed": active,
+								// The id on the element is what the self-check finds the chips by; a
+								// class alone would also match the CSS rule's own name by accident.
+								"data-tq-preset": preset.id,
+								title: t(preset.key),
+								// Read the tokens from the pressed button itself (it sits inside the
+								// app), exactly like the Match-theme button does, so the fit uses the
+								// background that is on screen at the moment of the click.
+								onClick: (e) => patchConfig(presetPatch(preset.id, themeBackground(e.currentTarget))),
+								children: [
+									jsx("span", { className: "tq-presetChip", style: { backgroundColor: chip } }),
+									jsx("span", { className: "tq-presetLabel", children: t(preset.key) })
+								]
+							}, preset.id);
+						})
+					}),
+					jsx("div", { className: "tq-hint", children: t("quips.presetsHint") })
 				] }),
 				jsx(ColorControl, {
 					value: cfg.color,
@@ -3521,6 +3735,16 @@ exports.__internal = {
 			rgbToHsl,
 			hslToHex,
 			fitToTheme,
+			// The colour presets, exposed as the REAL table plus the REAL patch builder the
+			// settings page calls — not as loose constants. The self-check enumerates this table
+			// and drives this function, so changing a preset's colour or breaking the follow-off
+			// wiring in the click handler turns the check red instead of being self-certified.
+			COLOR_PRESETS,
+			colorPreset,
+			presetColor,
+			presetPatch,
+			presetActive,
+			readableOn,
 			themeBackground,
 			themeScheme,
 			themeColor,
@@ -3535,6 +3759,11 @@ exports.__internal = {
 			injectPluginCss,
 			resolveLoader,
 			patchConfig,
+			// The config store itself, so a self-check can assert a preset landed in the reactive
+			// store the UI reads — not only in localStorage, which is written by the same call but
+			// is not what renderers subscribe to.
+			store,
+			loadConfig,
 			// The preview page drives one reconciliation pass itself so a control takes effect the
 			// moment it is changed instead of on the next 600ms poll (see livePass/forcePass above).
 			forcePass,

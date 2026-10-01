@@ -132,6 +132,77 @@ eq("brand blue is itself parseable", api.parseCssColor("#2E5BE8"), "#2e5be8");
 ok("fitted light colour stays inside the band", api.rgbToHsl(api.fitToTheme("#4176e6", "#ffffff")).l <= 57.5, api.rgbToHsl(api.fitToTheme("#4176e6", "#ffffff")).l.toFixed(2));
 ok("fitted dark colour stays inside the band", api.rgbToHsl(api.fitToTheme("#679efe", "#16181d")).l >= 61, api.rgbToHsl(api.fitToTheme("#679efe", "#16181d")).l.toFixed(2));
 
+console.log("\n── the matched colour clears AA even where the bare fit cannot (F1) ──");
+// WHY these inputs: each pair is one where fitToTheme's lightness band stops short, so the
+// bare fit returns a colour BELOW the ratio the settings page prints next to it. Before the
+// fix those were handed straight to the status line, and the theme-follow observer wrote them
+// into the saved config. Every number below is measured here, both halves in one place.
+const shortfalls = [
+	["light: teal accent", "#0e9c8e", "#ffffff"],
+	["light: teal accent on the near-white bg", "#0e9c8e", "#f9fafb"],
+	["mid grey: amber accent", "#c47a00", "#808080"],
+	["mid grey: deep blue accent", "#2e5be8", "#808080"]
+];
+for (const [name, accent, bg] of shortfalls) {
+	const bare = api.fitToTheme(accent, bg);
+	const bareCr = api.contrastRatio(bare, bg);
+	// The bug, pinned: the bare fit is exactly what the matcher used to return, and it misses AA.
+	ok(`${name}: bare fit is short — ${bare} is ${bareCr.toFixed(2)}:1`, bareCr < MIN, `fitToTheme(${accent}, ${bg})`);
+	const r = theme({ "--dsw-alias-link": accent }, { bg }).get();
+	ok(`${name}: matchThemeColor returns ${r.color} — ${r.contrast.toFixed(2)}:1`, r.contrast >= MIN - 0.02,
+		`raw ${r.raw} on ${r.bg} → ${r.color}`);
+	// One promise, not two: the matcher is the preset path's floor applied to the fit.
+	eq(`${name}: identical to readableOn(fitToTheme(...))`, r.color, api.readableOn(bare, bg));
+}
+// The fix belongs in the matcher, NOT in the fit: if someone "fixes" it by widening the band
+// (or by making the fit lenient), this exact banded value changes and says so.
+eq("fitToTheme itself is unchanged for teal on white (band not widened)", api.fitToTheme("#0e9c8e", "#ffffff"), "#0e978a");
+// ...and it is a colour-only fix: the follow flag is decided by the caller's patch, never here,
+// so "Match theme" still leaves `colorTheme: true` (asserted for the panel by test-settings-ui).
+ok("the matcher report carries no follow flag the fix could flip",
+	theme({ "--dsw-alias-link": "#0e9c8e" }, { bg: "#ffffff" }).get().colorTheme === undefined);
+
+console.log("\n── dead-zone sweep: every matcher result clears AA ──");
+// WHY this band: 0.18333 is the luminance where black and white are equally readable (4.58:1),
+// and 0.4 is fitToTheme's own dark/light threshold. Between them the fit classifies the
+// background as dark and LIGHTENS the accent — but lightening cannot reach AA there (pure white
+// is only 3.95:1 at 0.18333) while darkening clears it. Verifier measured 100% failure
+// (3456/3456) on #808080 before the fix. The grid below is the standing guard, and it walks
+// every grey plus the real app backgrounds so the fix cannot trade one band for another.
+{
+	const backgrounds = [];
+	for (let level = 0x00; level <= 0xff; level += 4) {
+		backgrounds.push("#" + [level, level, level].map((n) => n.toString(16).padStart(2, "0")).join(""));
+	}
+	const dead = backgrounds.filter((bg) => api.relativeLuminance(bg) > 0.18333 && api.relativeLuminance(bg) < 0.4);
+	backgrounds.push("#f9fafb", "#ffffff", "#16181d", "#0f1115");
+	const accents = [];
+	for (let hue = 0; hue < 360; hue += 10) accents.push(api.hslToHex(hue, 70, 50));
+	let checked = 0;
+	let worst = null;
+	let deadChecked = 0;
+	let deadWorst = null;
+	for (const bg of backgrounds) {
+		const inDead = dead.indexOf(bg) !== -1;
+		for (const accent of accents) {
+			const report = theme({ "--dsw-alias-link": accent }, { bg }).get();
+			checked++;
+			if (worst === null || report.contrast < worst.contrast) worst = { bg, accent, color: report.color, contrast: report.contrast };
+			if (inDead) {
+				deadChecked++;
+				if (deadWorst === null || report.contrast < deadWorst.contrast) deadWorst = { bg, accent, color: report.color, contrast: report.contrast };
+			}
+		}
+	}
+	ok("the dead-zone subset is non-empty and really inside the band", dead.length >= 10, `${dead.length} backgrounds`);
+	ok(`all ${checked} matcher results clear ${MIN}:1`, worst !== null && worst.contrast >= MIN - 0.02,
+		worst === null ? "no samples" : `worst ${worst.contrast.toFixed(2)}:1 (${worst.accent} on ${worst.bg} → ${worst.color})`);
+	ok(`dead zone alone: all ${deadChecked} clear ${MIN}:1`, deadWorst !== null && deadWorst.contrast >= MIN - 0.02,
+		deadWorst === null ? "no samples" : `worst ${deadWorst.contrast.toFixed(2)}:1 (${deadWorst.accent} on ${deadWorst.bg} → ${deadWorst.color})`);
+	console.log(`     sweep: ${backgrounds.length} backgrounds × ${accents.length} accents = ${checked} results`
+		+ `, worst ${worst.contrast.toFixed(2)}:1; dead zone ${dead.length} × ${accents.length} = ${deadChecked}, worst ${deadWorst.contrast.toFixed(2)}:1`);
+}
+
 console.log("\n── token extraction + priority ──");
 let r = theme({ "--dsw-alias-link": "#4176e6" }).get();
 eq("raw = accent token", r.raw, "#4176e6");

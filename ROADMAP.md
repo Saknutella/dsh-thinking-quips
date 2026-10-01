@@ -49,7 +49,9 @@ The indicator is the differentiator, so make it a first-class, configurable elem
       colour reaches 4.5:1 against `--dsw-alias-bg-base`. Follows theme switches
       until **Stop following** is pressed or the colour is edited by hand; a
       **Back to brand blue** button appears whenever a custom colour is in effect.
-- [ ] **Color presets** — brand blue / violet / teal / amber, one click each.
+- [x] **Color presets** — brand blue / violet / teal / amber, one click each; every chip is
+      fitted to the live background and floored at 4.5:1 (see 0.9.0 for the measurements, and
+      for the Match-theme contrast defect the presets uncovered).
 - [ ] **Generalize the `# <language>` sections** beyond Chinese / English: any
       `# <name>` header becomes a selectable section, and "Follow UI" maps the DSH
       locale onto it.
@@ -65,7 +67,52 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.8.0 — Official surfaces, the settings page & animation stability (current)
+## 0.9.0 — Colour presets & the contrast promise (current)
+
+Four one-click colours, a promise the plugin used to make and did not always keep, and two
+tests that could not have caught either.
+
+- [x] **Colour presets** — brand blue / violet / teal / amber as four chips in the settings
+      page, one click each. A chip is *not* a stored hex: it is fitted to the background on
+      screen and then floored at 4.5:1 (`presetColor` = `readableOn(fitToTheme(base, bg), bg)`),
+      so the same chip stays legible in the light and the dark theme — measured over 4 presets ×
+      8 backgrounds (32 combinations), worst value 4.52:1. Picking one writes `colorTheme: false` for the
+      same reason typing a hex does (a preset is the user naming a colour; staying on follow
+      would let the next theme switch overwrite the click). Brand blue writes the `shimmer`
+      sentinel rather than a hex, because in this plugin `shimmer` *is* the default brand blue
+      and the only value that leaves DSH's own `TextShimmer` and its theme token untouched —
+      writing a hex there would silently turn "the default" into "an override".
+- [x] **The 4.5:1 promise is now kept on the Match-theme path too** — this was a real, shipped
+      defect, surfaced while building the presets: a *preset* with a teal hue was more readable
+      than the theme match of the same hue. `fitToTheme` walks lightness inside a band and
+      **breaks at the band edge**, so it could return a colour still under `MIN_CONTRAST`:
+      measured `fitToTheme("#0E9C8E","#ffffff")` = 3.61:1 and `fitToTheme("#C47A00","#808080")`
+      = 3.07:1. On a mid-tone background the band points the wrong way entirely — over the 51
+      dead-zone greys × 108 accents (**5,508 combinations**), **5508/5508** results were under
+      4.5:1 before the fix (worst 1.18:1) and **0** were after (worst 4.50:1); the whole grey
+      range (86 × 108 = 9,288 combinations) is clean after it. The fix is one line: `matchThemeColor`
+      now returns
+      `readableOn(fitToTheme(accent, bg), bg)`, the same floor the presets use. The band and
+      `fitToTheme`'s own look are deliberately untouched, and a separate assertion pins
+      `fitToTheme("#0e9c8e","#ffffff") === "#0e978a"` so the floor cannot be "achieved" by
+      widening the band instead. Following the theme is unaffected: the matcher's report carries
+      no `colorTheme` field, and the settings page now shows 4.57:1 where it used to show 3.61:1.
+- [x] **Two test-honesty gaps closed** (both found by independent verification, not by the author
+      of the code). `test/test-sections.mjs` carried a **hand-written copy** of
+      `parseQuips`/`selectPhrases`, so breaking the shipped parser left it green; it now loads the
+      real module through `__internal` (a mutation that breaks the shipped header regex turns it
+      red — the old copy stayed green on that same mutation). And `test/test-i18n.mjs` treated the
+      new `quips.preset.*` keys as *notes* rather than assertions, so deleting one from both
+      dictionaries was invisible; it now enumerates `COLOR_PRESETS` through `__internal`, so a key
+      missing from either language fails. DSH renders a missing key as the key itself, so the user
+      would otherwise have read `quips.preset.teal` on the settings page.
+- [x] **Docs that had drifted** — the package description still advertised "six configurable
+      loading icons" (there are nine) and both READMEs still listed a separate "glow strength"
+      control that 0.8.0 had already folded back into sweep brightness; the handover doc also
+      carried a real local machine path, which the workspace's own rules forbid in a committed
+      file. No behavioural claims were added beyond what 0.9.0's checks measured.
+
+## 0.8.0 — Official surfaces, the settings page & animation stability
 
 Reuse what DSH already ships instead of redrawing it, give the settings a page of their own in
 the settings nav, and stop the running line's own re-renders from interrupting what is on screen.
@@ -255,6 +302,16 @@ the settings nav, and stop the running line's own re-renders from interrupting w
       (`$DSH_HOME/settings.yaml`) via a node-side route, so it survives plugin
       upgrades — today it lives in `localStorage`.
 - [ ] Optional: publish to npm with build provenance.
+- [ ] **Test strength: the lightness-band guard is weaker than it looks** (recorded by the
+      independent verification of 0.9.0, not fixed there). The `l <= 57.5` / `l >= 61` assertions
+      still pass when the band's *lower* edge is widened (32 → 18), and **nothing** fails when the
+      *upper* edge is (56 → 70). What actually catches a widened band today is the pinned
+      `fitToTheme("#0e9c8e","#ffffff")` value. To pin the band itself, assert the two constants,
+      or the band on a clamped input (e.g. a very light accent at `l = 80`).
+- [ ] **Test strength: the contrast floor is still asserted against `MIN_CONTRAST` itself**
+      (same verification). Lowering that constant to 1 is caught by the "held input" premises and
+      the pinned value, not by the `>= MIN_CONTRAST` comparisons — so the guard disappears the day
+      those premises do. A literal `4.5` in at least one assertion would make it independent.
 
 ## Non-goals
 
