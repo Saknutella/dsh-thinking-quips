@@ -1,0 +1,31 @@
+<svg width="36" height="36" viewBox="0 0 36 36" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!--
+    The plugin-list icon (Settings → 内置插件 → this plugin's row), declared as `icon` in
+    package.json and read by the Host as a data URI without loading the plugin.
+
+    Drawn to the recipe the one shipped third-party row uses (dsh-better-sidebar/icon.svg, read
+    from the profile): a 36x36 viewBox with a transparent background, the artwork inside roughly
+    x 6-30 / y 6-29, rounded geometry (rx 3.5) and two soft linear gradients — #69B9FF→#324DE2
+    blue and #45E7A4→#05909D teal. The inventory provides the pale rounded tile behind it, so the
+    icon itself must stay background-free.
+
+    The motif is the plugin's own: a speech bubble (a quip) whose pointer is a whale fluke —
+    two tips with a notch — i.e. what the plugin does (talk on the running line) plus whose whale
+    it belongs to. Gradient ids are prefixed so an inline copy cannot collide with page ids.
+  -->
+  <rect x="6" y="6.5" width="24" height="16" rx="3.5" fill="url(#tqBubble)" />
+  <circle cx="12.6" cy="14.5" r="1.45" fill="#FFFFFF" />
+  <circle cx="18" cy="14.5" r="1.45" fill="#FFFFFF" />
+  <circle cx="23.4" cy="14.5" r="1.45" fill="#FFFFFF" />
+  <path d="M10 21.5l-3.1 7.2 4.6-3.4 3.3 3.9.2-7.7z" fill="url(#tqFluke)" />
+  <defs>
+    <linearGradient id="tqBubble" x1="6" y1="6" x2="30" y2="29" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#69B9FF" />
+      <stop offset="1" stop-color="#324DE2" />
+    </linearGradient>
+    <linearGradient id="tqFluke" x1="7" y1="22" x2="15" y2="29" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#45E7A4" />
+      <stop offset="1" stop-color="#05909D" />
+    </linearGradient>
+  </defs>
+</svg>

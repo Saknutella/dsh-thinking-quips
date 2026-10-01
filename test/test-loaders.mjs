@@ -26,9 +26,12 @@ function makeEl(tag) {
 		style: { props: {}, setProperty(k, v) { this.props[k] = v; }, removeProperty(k) { delete this.props[k]; } },
 		_attrs: {},
 		_classes: [],
-		appendChild(child) { el.children.push(child); child.parentNode = el; return child; },
+		appendChild(child) { if (child.parentNode) child.parentNode.removeChild(child); el.children.push(child); child.parentNode = el; return child; },
 		get firstChild() { return el.children.length ? el.children[0] : null; },
 		insertBefore(child, ref) {
+			// Detach first, then resolve the reference position — real DOM order (see the same
+			// note in test-adapt-02: computing the index before the detach inserts too late).
+			if (child.parentNode) child.parentNode.removeChild(child);
 			const at = ref ? el.children.indexOf(ref) : -1;
 			if (at === -1) el.children.push(child); else el.children.splice(at, 0, child);
 			child.parentNode = el;
@@ -83,8 +86,9 @@ const realNow = Date.now;
 Date.now = () => clock;
 let pendingFrames = [];
 let rafCalls = 0;
+let cancelCalls = 0;
 globalThis.requestAnimationFrame = (cb) => { rafCalls++; pendingFrames.push(cb); return rafCalls; };
-globalThis.cancelAnimationFrame = () => {};
+globalThis.cancelAnimationFrame = () => { cancelCalls += 1; };
 const runFrame = (advanceMs) => {
 	const next = pendingFrames;
 	pendingFrames = [];
@@ -93,11 +97,39 @@ const runFrame = (advanceMs) => {
 	return next.length;
 };
 
-const reactStub = { useState: () => [0, () => {}], useEffect: () => {}, useSyncExternalStore: (_s, get) => get() };
+const reactStub = {
+	useState: () => [0, () => {}],
+	useEffect: () => {},
+	useSyncExternalStore: (_s, get) => get(),
+	createElement: (type, props, ...children) => ({ type, props, children })
+};
 const jsxStub = (t, p) => ({ t, p });
+// The official icon options read the seeded primitives and mount a React root, so both
+// stubs are switchable: `withPrimitives = false` is an older shell that seeds neither.
+const StateDotStub = function StateDot() {};
+const FISH_PATH = "M22.9168 1.43018C22.6713 1.31018 22.4223 1.65519Z";
+let withPrimitives = true;
+const official = { renders: [], unmounts: 0, roots: 0 };
+/** The disposers this instance's `ctx.effect` calls returned (reset per apply). */
+let effectDisposers = [];
 const requireStub = (name) => {
 	if (name === "react") return reactStub;
 	if (name === "react/jsx-runtime") return { jsx: jsxStub, jsxs: jsxStub };
+	if (name === "react-dom/client") {
+		return {
+			createRoot: (container) => {
+				official.roots++;
+				return {
+					render: (element) => { official.renders.push({ container, element }); },
+					unmount: () => { official.unmounts++; }
+				};
+			}
+		};
+	}
+	if (name === "@deepseek-ai/dsh-client-ui-primitives") {
+		if (!withPrimitives) throw new Error("seed unavailable on this shell");
+		return { StateDot: StateDotStub, FISH_LOGO_PATH: FISH_PATH, FISH_LOGO_VIEWBOX: { width: 23.16, height: 17.04 } };
+	}
 	throw new Error("unexpected require: " + name);
 };
 
@@ -106,10 +138,15 @@ if (loaded === null) throw new Error("module did not register a factory");
 const api = loaded.factory(requireStub).__internal;
 if (!api || !Array.isArray(api.LOADER_STYLES)) throw new Error("LOADER_STYLES is not exposed via __internal");
 
-function applyWith(loader, loaderSize, reuse, extra) {
+function applyWith(loader, loaderSize, reuse, extra, opts) {
 	globalThis.window.__DSH_THINKING_QUIPS__ = false; // the once-guard is per-apply
+	withPrimitives = !(opts && opts.withPrimitives === false);
+	official.renders = [];
+	official.unmounts = 0;
+	official.roots = 0;
+	effectDisposers = [];
 	globalThis.localStorage = {
-		getItem: () => JSON.stringify(Object.assign({ color: "shimmer", glow: 35, quips: [], loader, loaderSize }, extra || {})),
+		getItem: () => JSON.stringify(Object.assign({ color: "shimmer", quips: [], loader, loaderSize }, extra || {})),
 		setItem: () => {}
 	};
 	if (reuse !== true) statusEl = makeStatusEl();
@@ -120,7 +157,11 @@ function applyWith(loader, loaderSize, reuse, extra) {
 		on: () => {},
 		locale: { register: () => ({}), getLocale: () => ({ active: "en" }) },
 		slots: { inject: (_n, cb) => { cb(); return () => {}; }, register: () => () => {} },
-		effect: (fn) => fn()
+		effect: (fn) => {
+			const disposer = fn();
+			if (typeof disposer === "function") effectDisposers.push(disposer);
+			return disposer;
+		}
 	};
 	plugin.apply(ctx);
 	if (intervalFn === null) throw new Error("apply did not schedule a poll");
@@ -304,11 +345,15 @@ console.log("OK   the colour override covers .tq-wave");
 // The speed is three steps (slow / normal / fast) and "normal" must leave no trace.
 // Everything the plugin animates reads the variable. DSH's own sweep is deliberately
 // NOT scaled any more: on 0.2 it animates inside the primitives' TextShimmer, so the
-// only thing the speed may write is the variable itself.
+// speed sheet may only ever carry the plugin's OWN `native` cue (see the last block) —
+// never a rule that reaches into DSH's sweep.
 applyWith("orbit", "md", false, { speed: "fast" });
 if (document.documentElement.style.props["--tq-speed"] !== "2") throw new Error(`--tq-speed was not set for fast: ${JSON.stringify(document.documentElement.style.props)}`);
 const speedStyle = document.getElementById("dsh-thinking-quips-speed");
-if (speedStyle !== null && speedStyle.textContent !== "") throw new Error(`the speed must not override DSH's shimmer any more: ${speedStyle.textContent}`);
+if (speedStyle !== null && speedStyle.textContent !== ""
+	&& (speedStyle.textContent.indexOf("tq-swim") === -1 || /sweep|highlight|shimmer|runningText/.test(speedStyle.textContent))) {
+	throw new Error(`the speed sheet must touch nothing but the plugin's own cue: ${speedStyle.textContent}`);
+}
 applyWith("orbit", "md", false, { speed: "slow" });
 if (document.documentElement.style.props["--tq-speed"] !== "0.5") throw new Error("--tq-speed was not set for slow");
 applyWith("orbit", "md", false, { speed: "normal" });
@@ -375,5 +420,171 @@ if (swappedBoth === afterResize) throw new Error("a style change did not rebuild
 if (!swappedBoth._classes.includes("tq-loader-dots")) throw new Error("the rebuilt icon has the wrong style");
 if (swappedBoth.style.props["--tq-loader-scale"] !== "1.25") throw new Error("the rebuilt icon lost the size");
 console.log("OK   style change rebuilds and keeps the size");
+
+// The official icon options: DSH's own StateDot and logo path, reused rather than
+// redrawn. Both need the seeded primitives, so both must also degrade to a plugin-drawn
+// icon — and keep reporting what the user actually picked — on a shell that seeds none.
+console.log("\n── the official icon options ──");
+const effectiveOf = (span) => span.getAttribute("data-effective");
+const requestedOf = (span) => span.getAttribute("data-style");
+{
+	const dot = applyWith("stateDot", "md");
+	if (effectiveOf(dot) !== "stateDot") throw new Error(`stateDot did not render itself: ${effectiveOf(dot)}`);
+	if (requestedOf(dot) !== "stateDot") throw new Error("data-style lost the requested value");
+	const box = dot.children[0];
+	if (!box || !(box._classes || []).includes("tq-dotBox")) throw new Error("the official dot has no box to mount in");
+	if (official.renders.length !== 1) throw new Error(`expected one render of the dot, got ${official.renders.length}`);
+	if (official.renders[0].element.type !== StateDotStub) throw new Error("the official StateDot was not the rendered component");
+	if (official.renders[0].element.props.state !== "ongoing") {
+		throw new Error(`StateDot state is ${official.renders[0].element.props.state}, want ongoing`);
+	}
+	if (official.renders[0].container !== box) throw new Error("the dot was rendered outside its own box");
+	console.log("OK   stateDot mounts the official StateDot in its ongoing state");
+	// A React root left mounted on a detached node is a leak, so teardown has to unmount
+	// it. Observed through the effect disposers: the root lives in module state, so only
+	// the same instance can prove this (a fresh instance starts with no root at all).
+	for (const dispose of effectDisposers) dispose();
+	if (official.unmounts === 0) throw new Error("teardown left the official dot's React root mounted");
+	console.log("OK   teardown unmounts the official dot's React root");
+	// A style switch still rebuilds even though the previous node was an official one.
+	const other = applyWith("orbit", "md", true);
+	if (effectiveOf(other) !== "orbit") throw new Error("the switch back did not rebuild the plugin icon");
+	console.log("OK   an official icon is replaced when the style changes");
+}
+{
+	const fish = applyWith("fish", "md");
+	if (effectiveOf(fish) !== "fish") throw new Error(`fish did not render: ${effectiveOf(fish)}`);
+	const svg = fish.children[0];
+	if (!svg || svg.tagName !== "svg") throw new Error("fish did not build an <svg>");
+	if (svg.getAttribute("viewBox") !== "0 0 23.16 17.04") throw new Error(`fish viewBox is ${svg.getAttribute("viewBox")}`);
+	const shape = svg.children[0];
+	if (!shape || shape.getAttribute("d") !== FISH_PATH) throw new Error("fish did not use the seeded logo path");
+	if (shape.getAttribute("fill") !== "currentColor") throw new Error("fish does not inherit the configured colour");
+	console.log("OK   fish draws the seeded logo path in the official viewBox");
+}
+{
+	const dot = applyWith("stateDot", "md", false, null, { withPrimitives: false });
+	if (effectiveOf(dot) !== "ring") throw new Error(`stateDot should degrade to the plugin spinner, got ${effectiveOf(dot)}`);
+	if (requestedOf(dot) !== "stateDot") throw new Error("the degraded icon forgot what the user picked");
+	if (!dot.children.some((c) => c.tagName === "svg")) throw new Error("the fallback ring is not an svg");
+	console.log("OK   without the seed stateDot degrades to the plugin's own ring");
+}
+{
+	const fish = applyWith("fish", "md", false, null, { withPrimitives: false });
+	if (effectiveOf(fish) !== "orbit") throw new Error(`fish should degrade to orbit, got ${effectiveOf(fish)}`);
+	if (requestedOf(fish) !== "fish") throw new Error("the degraded icon forgot what the user picked");
+	if (fish.children.length === 0) throw new Error("the fallback orbit drew no cells");
+	console.log("OK   without the seed fish degrades to the default orbit");
+}
+{
+	const plain = applyWith("orbit", "md");
+	if (effectiveOf(plain) !== "orbit" || requestedOf(plain) !== "orbit") {
+		throw new Error(`a plugin-drawn style reports ${requestedOf(plain)}/${effectiveOf(plain)}`);
+	}
+	console.log("OK   plugin-drawn styles report the same requested and effective style");
+}
+
+// The 0.1.x status element has no whale, so `native` must paint the mask the official
+// stylesheet uses. That declaration sits two levels deep (@supports → @media → rule), so
+// this also pins the recursion and both guards: only a rule that mentions `running` AND
+// carries an embedded PNG counts, and only its URL is taken (the shorthand's
+// `50%/100% 100% no-repeat alpha` tail is not a value `mask-image` accepts).
+console.log("\n── native without a whale to copy ──");
+const B64 = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUg==";
+const WHALE_URL = 'url("' + B64 + '")';
+{
+	const decoy = { selectorText: ".somethingElse", style: { getPropertyValue: () => "url(data:image/png;base64,AAAA)" } };
+	const inner = {
+		selectorText: ".EvIC1a_runningWhaleAnimated",
+		style: { getPropertyValue: (name) => (name === "mask" ? WHALE_URL + " 50%/100% 100% no-repeat alpha" : "") }
+	};
+	// The middle node carries no `style` at all: the walk must still descend through it.
+	const sheet = {
+		ownerNode: { dataset: { pluginCss: "@deepseek-ai/dsh-client-ui-chat/ChatView.module.css" } },
+		cssRules: [{ style: { getPropertyValue: () => "" }, cssRules: [{ cssRules: [inner] }] }]
+	};
+	document.styleSheets = [{ ownerNode: { dataset: {} }, cssRules: [decoy] }, sheet];
+	const span = applyWith("native", "md");
+	if (effectiveOf(span) !== "native") throw new Error(`native should paint the official mask, got ${effectiveOf(span)}`);
+	if (requestedOf(span) !== "native") throw new Error("the requested style was lost");
+	if (span.style.props["mask-image"] !== WHALE_URL) throw new Error(`mask-image is ${span.style.props["mask-image"]}`);
+	if (span.style.props["mask-size"] !== "100% 100%") throw new Error("the mask was not sized");
+	if (span.style.props["background"] !== "currentColor") throw new Error("the whale would not follow the configured colour");
+	if (statusEl.getAttribute("data-tq-icon") !== "native") throw new Error("the drawn icon was not recorded on the line");
+	if (span.children.length !== 0) throw new Error("the mask branch should not draw children");
+	console.log("OK   native reads the official mask out of the nested CSSOM rules");
+	delete document.styleSheets;
+}
+{
+	const span = applyWith("native", "md");
+	if (effectiveOf(span) !== "orbit") throw new Error(`native should degrade to orbit, got ${effectiveOf(span)}`);
+	if (requestedOf(span) !== "native") throw new Error("the degraded icon forgot what the user picked");
+	if (statusEl.getAttribute("data-tq-icon") !== "orbit") throw new Error("the icon marker must follow what was actually drawn");
+	console.log("OK   without a whale or a stylesheet native degrades to orbit");
+}
+
+// Two morphs in one module instance: the loop's requestAnimationFrame HANDLE used to be
+// called as if it were a function, and the throw was swallowed by ensureLoader — so the
+// second morph icon was never even appended. (Found by rendering the gallery page in the
+// workspace's headless Chromium: 2 of its 3 morph cells were empty.)
+console.log("\n── a second morphing indicator ──");
+{
+	const hostA = makeEl("span");
+	const hostB = makeEl("span");
+	cancelCalls = 0;
+	api.ensureLoader(hostA, "morph", "md");
+	const first = hostA.children.find((c) => (c._classes || []).includes("tq-loader"));
+	if (!first || !first.children.some((c) => c.tagName === "svg")) throw new Error("the first morph drew no svg");
+	if (cancelCalls !== 0) throw new Error(`nothing to cancel yet, but cancelAnimationFrame ran ${cancelCalls} time(s)`);
+	api.ensureLoader(hostB, "morph", "md");
+	const second = hostB.children.find((c) => (c._classes || []).includes("tq-loader"));
+	if (!second || !second.children.some((c) => c.tagName === "svg")) throw new Error("the second morph drew no svg");
+	if (cancelCalls !== 1) throw new Error(`the previous loop should be cancelled once, got ${cancelCalls}`);
+	console.log("OK   a second morphing indicator is built and cancels the previous loop");
+}
+
+// The whale is a 28x28 APNG used as an alpha mask, i.e. a RASTER: `transform: scale()`
+// would rasterise it at 14px and then stretch the bitmap (visibly soft at Large), so
+// `native` is sized in real pixels instead. And its frame delays live inside the image, so
+// no CSS can retime them: the speed level can only add the plugin's own cue, and only off
+// Normal — which is also why the always-on stylesheet must never reference the keyframes.
+console.log("\n── the native icon's sizing and its speed cue ──");
+{
+	const nativeBox = rule(".tq-loader-native");
+	if (nativeBox.indexOf("transform:none!important") === -1) throw new Error(`native still uses the shared transform: ${nativeBox}`);
+	// The icon follows DSH's own running-text token, so in `indicatorOnly` mode — where the text
+	// stays DSH's — the icon is not the single custom-coloured thing on the line.
+	const loaderBase = rule(".tq-loader");
+	if (loaderBase.indexOf("var(--dsw-alias-label-deep-diving") === -1) {
+		throw new Error(`the icon ignores DSH's running-text colour: ${loaderBase}`);
+	}
+	const nativeIcon = rule('.tq-loader-native [class*="runningIcon"]');
+	if (nativeIcon.indexOf("var(--tq-loader-scale,1)") === -1) throw new Error(`native is not sized by --tq-loader-scale: ${nativeIcon}`);
+	const nativeEmpty = rule(".tq-loader-native:empty");
+	if (nativeEmpty.indexOf("var(--tq-loader-scale,1)") === -1) throw new Error(`the mask branch is not sized either: ${nativeEmpty}`);
+	if (css.indexOf("@keyframes tq-swim") === -1) throw new Error("CSS missing the swim keyframes");
+	if (css.indexOf("animation:tq-swim") !== -1) throw new Error("the cue must not be in the always-on stylesheet");
+	if (css.indexOf('.tq-loader-native [class*="runningIcon"]{animation:none!important}') === -1) {
+		throw new Error("reduced motion does not stop the swim cue");
+	}
+	console.log("OK   native is sized in real pixels, and the cue is never on by default");
+
+	const cue = (speed) => {
+		applyWith("orbit", "md", false, { speed });
+		const el = stylesById["dsh-thinking-quips-speed"];
+		return el ? el.textContent : null;
+	};
+	const normal = cue("normal");
+	if (normal !== null && normal !== "") throw new Error(`Normal must write no cue rule, got ${JSON.stringify(normal)}`);
+	const fast = cue("fast");
+	if (fast !== '.tq-loader-native [class*="runningIcon"]{animation:tq-swim 0.700s ease-in-out infinite}') {
+		throw new Error(`the fast cue is ${JSON.stringify(fast)}`);
+	}
+	const slow = cue("slow");
+	if (slow !== '.tq-loader-native [class*="runningIcon"]{animation:tq-swim 2.800s ease-in-out infinite}') {
+		throw new Error(`the slow cue is ${JSON.stringify(slow)}`);
+	}
+	console.log("OK   the cue is written only off Normal, at 1.4s / speed (fast 0.7s, slow 2.8s)");
+}
 
 console.log("ALL LOADER CHECKS PASSED");

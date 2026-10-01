@@ -65,7 +65,122 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.7.0 — DSH 0.2 (current)
+## 0.8.0 — Official surfaces, the settings page & animation stability (current)
+
+Reuse what DSH already ships instead of redrawing it, give the settings a page of their own in
+the settings nav, and stop the running line's own re-renders from interrupting what is on screen.
+
+- [x] **Official icon options** — three more loader styles, each reusing DSH's own asset
+      rather than a copy of it: `stateDot` renders the seeded `StateDot` in its `ongoing`
+      state (a real spinner, through a small React root), `fish` assembles the seeded
+      `FISH_LOGO_PATH` into the plugin's own svg, and `native` **clones DSH's own
+      running-line whale** out of the live DOM. The clone is byte-identical and keeps both
+      of DSH's variants — the 60-frame APNG mask and the static SVG — so the official
+      `@supports` / `prefers-reduced-motion` gating keeps working for free. When the icon
+      node is not there, `native` falls back to reading the mask out of the official
+      stylesheet's CSSOM (the rule is nested two levels deep, `@supports` → `@media`), and
+      when neither is available it degrades like the other official options
+      (`stateDot → ring`, `fish`/`native` → `orbit`). DSH's whale is a **choice** rather than
+      a permanent neighbour: whenever the plugin draws an icon of its own, the wrapper is
+      marked (`data-tq-icon`) and the stylesheet retires DSH's node by attribute — leaving
+      the node itself untouched — so the line always shows exactly one indicator. Pick
+      `native` to have DSH's own whale be that one.
+- [x] **The raster whale: sized in pixels, with a speed cue** — DSH's running whale is a
+      28×28 APNG used as an alpha mask, so the shared `transform: scale()` rasterised it at
+      14px and then stretched the bitmap, which is visibly soft at Large. `native` now sizes
+      the box itself (`calc((14px + font-delta) * var(--tq-loader-scale))`) and opts out of
+      the transform, so the mask is rasterised at its final size (11.2 / 14 / 17.5px — all
+      downscales from 28px). The APNG's 60 frame delays live *inside the image*, which no CSS
+      property can retime, so a speed level adds the plugin's own swim cue around the
+      official motion (`1.4s / speed`), written only off Normal — Normal still overrides
+      nothing — stopped by `prefers-reduced-motion`, and explained in the settings row while
+      `native` is selected.
+- [x] **A face in the plugin list** — the settings inventory (内置插件) reads display metadata
+      from the package WITHOUT loading the plugin, so that row used to show the raw package name
+      and the panel's default artwork. It now ships `icon.svg` (36x36, transparent, the soft
+      two-gradient recipe the one shipped row with an icon uses — a speech bubble whose pointer
+      is a whale fluke) and `locale/{en,zh}.json`; `"./locale/*.json"` had to join `exports`, or
+      the resolver never sees the files and the fallback quietly wins. `test-package.mjs`
+      asserts every rule DSH applies, including that the row's title equals the plugin's own.
+- [x] **The settings live on their own page** — twelve controls were a row under General
+      (`settings.general.item`), which is the seat for *one* preference and shared with every
+      other plugin that adds one. They moved to `settings.section`: its own nav entry
+      (id `thinking-quips`, order 30, label thunk so it follows the locale), rendering the page
+      body into the panel's content column.
+- [x] **A nav glyph of the plugin's own** — DSH picks the settings-nav icon from a table keyed
+      by section id (`navIcon` in dsh-client-ui-settings-general) and hands an unknown id the
+      settings gear, so a third-party section cannot supply one. The plugin marks its own nav
+      row (`data-tq-section`, matched by the label it registered) and the stylesheet retires the
+      gear in that row and paints a **16×16 whale tail** as a mask — same box as DSH's icons
+      (measured: viewBox 16, size 16, `ICON_MEDIUM_STROKE` 1.3), drawn filled because a 1.3
+      outline closes up at that size. If the panel's markup ever changes, no row matches and the
+      gear simply stays.
+- [x] **Indicator-only works like the rest of the line** — with the text handed back to DSH,
+      the icon used to be *appended*, so it landed to the RIGHT of DSH's own label, and it was
+      the single custom-coloured thing on a line whose text kept DSH's default colour. The icon
+      is now anchored on "whatever renders the text" (the plugin's own line, else DSH's label),
+      the empty plugin line is removed rather than left behind to become that anchor, and the
+      icon follows DSH's own running-text token — which `paintHost` also writes when a custom
+      colour is set. The mode stays: it is the only way to sit next to another plugin that owns
+      the status text.
+- [x] **The sweep's brightness is a control again** — retired with the `glow` effect it used
+      to belong to, it came back where it actually belongs: measured in the installed
+      primitives, the official `TextShimmer` stylesheet paints `.sweep { color:
+      var(--dsw-alias-label-shimmer) }` and masks it with a moving gradient, so that token IS
+      the highlight. `glow` (0–100) now writes a mix of the text colour toward white there: the
+      shipped default writes nothing at all (DSH keeps painting), the default colour with
+      another brightness writes only the sweep, and a custom colour moves both. The preview
+      page reproduces that component from its own stylesheet so the control can be seen.
+- [x] **One sweep, not two** — the plugin used to carry its own hand-painted
+      `background-clip:text` gradient as the `glow` effect (and as the fallback when the
+      primitives were missing). Side by side with the official sweep it was
+      indistinguishable, so it is gone: `TEXT_EFFECTS` is now `shimmer` (DSH's own
+      `TextShimmer`, rendered through the seed) plus `wave`, the painted-gradient CSS and
+      its keyframes are deleted along with the `glow` strength setting, and a shell with no
+      primitives falls back to plain text (guarded, so it cannot churn the DOM). A saved
+      `official` or `glow` config maps onto the sweep.
+- [x] **A re-render must not touch the quip or the animation** — DSH rebuilds the running
+      line whenever the turn re-renders (every tool call, and once a second for the elapsed
+      label). The plugin used to read "there is no icon in this element yet" as a first paint,
+      so every tool call reset the rotation to quip #1 — which changed the text and rebuilt the
+      animating container. The rotation now comes from a clock alone (`quipIndex`), and when
+      the line is replaced the plugin's own nodes are **carried over** into the new element
+      (`adoptNodes`), with the official React root re-pointed rather than remounted. For the
+      same reason `wave` now updates its tokens' text in place when the token shape is
+      unchanged, so the once-a-second elapsed tick no longer restarts the wave.
+- [x] **The icon keeps its place when the style changes mid-turn** — the rebuild used to
+      `appendChild`, so picking another style while a turn was running pushed the icon to the
+      END of the line (past the plugin's own text). It is now inserted immediately before the
+      plugin's own `line` element, and the "nothing to redraw" path repairs a misplaced icon
+      once (checked with `previousElementSibling`, so a whitespace text node cannot make it
+      re-insert every pass — that would feed the observer loop fixed below).
+- [x] **Two real bugs found by actually rendering the gallery** (not by reading code):
+      the shimmer/official fallback deleted and rebuilt its glow container on every pass,
+      and the plugin's own `document.body` MutationObserver turned each mutation into
+      another pass as a microtask — an endless chain that froze the tab (in headless
+      Chromium `DOMContentLoaded` never fired). It now reuses the container, so the
+      `data-text` guard holds. Separately, the morph loop's `requestAnimationFrame`
+      *handle* was being called as a function, which threw inside `ensureLoader`'s
+      try/catch and silently dropped every second and later morph icon; it is now
+      cancelled with `cancelAnimationFrame`. Both have regression assertions.
+- [x] **Settings controls from the seeds** — the row's hand-written switch, segmented
+      controls and modal are now thin wrappers around the seeded `Switch`,
+      `SegmentedControl` and `Modal`, each falling back to the old hand-written markup on a
+      shell that seeds nothing. The official `Modal` brings its own mask, close button,
+      Escape/Tab handling and focus restore (and `data-modal-autofocus` for the textarea).
+- [x] **Running surface** — the plugin reads `dshDesktop` / `<html data-platform>` and
+      watches the mark, because it can arrive as late as `DOMContentLoaded`. The result is
+      a runtime fact: it lives in a store that is deliberately **not** persisted (it must
+      never end up in the saved preference config) and is echoed read-only in the settings
+      row as `data-tq-surface` / `data-tq-platform`.
+- [x] **Offline animation gallery** — `preview/animations.html`, generated by
+      `tools/build-preview.mjs`. It embeds the shipped `lib/client.js` verbatim and calls
+      the plugin's own `injectPluginCss` / `ensureLoader` / `applyStatusText` / `apply` on
+      mock status lines, inlining the official whale stylesheet and logo path extracted
+      from the installed DSH. `test/test-preview.mjs` rebuilds it in memory, so a page
+      that has fallen behind the plugin is a red self-check rather than silent rot.
+
+## 0.7.0 — DSH 0.2
 
 - [x] **0.2 anchor** — the running line is `[data-chat-running]` now, and the only
       `role="status"` inside it is a screen-reader announcement clipped to 1px, so the old
@@ -99,12 +214,14 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [x] **Declaration hygiene** — `@deepseek-ai/dsh-client-runtime` no longer exists in 0.2
       (the profile still had a dangling junction for it); dropped from `dsh.client.inject`
       and the peers, `engines.dsh` bumped to `>=0.2.0-rc.2`.
-- [ ] **Adopt more official UI** — the settings row still hand-rolls its switch,
-      segmented control and modal; `@deepseek-ai/dsh-client-ui-primitives` exports
-      `Switch`, `SegmentedControl`, `Modal`, `Toast` and `SettingsForm`.
-- [ ] **Native icon options** — offer DSH's whale / `StateDot` / `FishLogo` as loader
-      styles (the zero-copy ways to reach the whale APNG are recorded in the source
-      repository's `docs/状态行扩展调研.md`; research notes are not shipped in the npm package).
+- [x] **Adopt more official UI** (landed in 0.8.0) — the settings row used to hand-roll its
+      switch, segmented control and modal; `@deepseek-ai/dsh-client-ui-primitives` exports
+      `Switch`, `SegmentedControl`, `Modal`, `Toast` and `SettingsForm`, and the row now
+      prefers the first three.
+- [x] **Native icon options** (landed in 0.8.0) — DSH's whale (`native`), `StateDot` and the
+      `FishLogo` path are now loader styles (the zero-copy ways to reach the whale APNG are
+      recorded in the source repository's `docs/状态行扩展调研.md`; research notes are not
+      shipped in the npm package).
 
 ## 0.6.0 — Text effects & one global speed
 
