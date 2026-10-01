@@ -501,17 +501,37 @@ console.log("\n── wave ──");
 
 // ── 5. the elapsed time: inline (0.2 shape) vs beside (0.1 shape) ────────────
 console.log("\n── elapsed time ──");
+/** Set the duration the shell's own label shows (both the text and the decoration copy). */
+const shownLabel = (m, text) => {
+	m.dom.labelText.nodeValue = text;
+	m.dom.copy.setAttribute("data-shimmer-text", text);
+};
 {
 	const m = await mount({ textEffect: "official", clockMode: "inline" });
 	m.plugin.__internal.officialTurn.startTime = clock - 65_000;
+	shownLabel(m, "深度求索中，用时 1分5秒 ···");
 	m.plugin.apply(m.ctx);
 	const text = m.renders[m.renders.length - 1].element.children[0];
-	ok("inline folds the official duration into the animated text", text.indexOf("用时 1分5秒") !== -1, text);
+	ok("inline folds the duration into the animated text", text.indexOf("用时 1分5秒") !== -1, text);
 	ok("inline leaves no separate clock node", m.dom.wrapper.querySelector(".tq-clock") === null);
+}
+{
+	// The shell's own label IS the clock: the shell reads the running turn's start from its own
+	// store and rewrites that label every second, so it survives a refresh that re-mounts the
+	// plugin. When the two disagree, the shell's line is the number the user reads — so it wins.
+	// (Reported as a mismatch: the plugin said 8m 27s while the shell's own line said 10m 46s.)
+	const m = await mount({ textEffect: "official", clockMode: "inline" });
+	m.plugin.__internal.officialTurn.startTime = clock - 507_000; // 8m27s
+	shownLabel(m, "深度求索中，用时 10分46秒 ···");
+	m.plugin.apply(m.ctx);
+	const text = m.renders[m.renders.length - 1].element.children[0];
+	ok("the shell's own duration wins over the seat's start",
+		text.indexOf("10分46秒") !== -1 && text.indexOf("8分27秒") === -1, text);
 }
 {
 	const m = await mount({ textEffect: "official", clockMode: "separate" });
 	m.plugin.__internal.officialTurn.startTime = clock - 65_000;
+	shownLabel(m, "深度求索中，用时 1分5秒 ···");
 	m.plugin.apply(m.ctx);
 	const clockSpan = m.dom.wrapper.querySelector(".tq-clock");
 	ok("beside renders a separate grey clock node", clockSpan !== null && clockSpan.parentNode.classList.contains("tq-line"));
@@ -528,15 +548,45 @@ console.log("\n── elapsed time ──");
 	ok("off leaves the plain quip", text.indexOf("用时") === -1, text);
 }
 {
-	// No official time known: the plugin times the line itself.
+	// No duration anywhere: neither the shell's label nor the seat knows one, so the plugin times
+	// the line itself.
 	const m = await mount({ textEffect: "official", clockMode: "separate" });
+	shownLabel(m, "深度求索中");
 	m.plugin.apply(m.ctx);
 	clock += 2_000;
 	m.plugin.apply(m.ctx);
 	m.timers[0]();
 	const clockSpan = m.dom.wrapper.querySelector(".tq-clock");
-	ok("without the official seat the self-timer covers it", clockSpan !== null && clockSpan.textContent === "2秒", clockSpan && clockSpan.textContent);
+	ok("without a duration anywhere the self-timer covers it", clockSpan !== null && clockSpan.textContent === "2秒", clockSpan && clockSpan.textContent);
 	clock -= 2_000;
+}
+{
+	// The DOM must not touch the official clock.
+	//
+	// WHY: the first version of this fix dropped the official start on the first pass that missed
+	// the running line. The shell replaces that line as it re-renders and a refresh re-mounts the
+	// whole tree, so a miss is routine — and the seat does not re-run for a DOM-only change, so
+	// the start never came back and a mid-turn refresh restarted the clock at zero (the user's
+	// follow-up). Leaving the line only resets the SELF-timer; the seat owns the official clock,
+	// and the shell's own label is the primary source anyway (see `elapsedFrom`).
+	const m = await mount({ textEffect: "official", clockMode: "inline" });
+	shownLabel(m, "深度求索中"); // no duration in the shell's own label
+	const start = clock - 3_600_000;
+	m.plugin.__internal.recordTurnClock({ turn: "A", status: "open", start: { time: start } });
+	m.plugin.apply(m.ctx);
+	ok("an open turn from the seat owns the clock slot", m.plugin.__internal.officialTurn.startTime === start);
+	m.dom.body.removeChild(m.dom.wrapper);
+	m.plugin.__internal.forcePass();
+	clock += 60_000; // gone for a minute: far beyond any debounce a fix might grow
+	m.plugin.__internal.forcePass();
+	ok("a line that leaves never drops the official clock", m.plugin.__internal.officialTurn.startTime === start,
+		JSON.stringify(m.plugin.__internal.officialTurn));
+
+	// The seat still can, and does: its turn stopped being open.
+	m.plugin.__internal.recordTurnClock({ turn: "A", status: "closed", start: { time: start } });
+	ok("the seat hands the slot back when its turn closes",
+		m.plugin.__internal.officialTurn.turn === undefined && m.plugin.__internal.officialTurn.startTime === undefined,
+		JSON.stringify(m.plugin.__internal.officialTurn));
 }
 
 // ── 5b. the native loader clones DSH's own whale ─────────────────────────────
@@ -693,7 +743,8 @@ console.log("\n── the wave across the elapsed tick ──");
 {
 	// The inline clock rewrites the line every second (it carries the duration). Rebuilding the
 	// wave items then restarted the wave every second — the same stutter class as the tool-call
-	// bug above — so an unchanged token SHAPE is now updated in place.
+	// bug above — so an unchanged token SHAPE is now updated in place. The duration comes from
+	// the shell's own label, so the tick is simulated the way the shell does it: rewrite the label.
 	const m = await mount({ textEffect: "wave", clockMode: "inline" });
 	m.plugin.apply(m.ctx);
 	const line = m.dom.wrapper.querySelector(".tq-line");
@@ -701,6 +752,7 @@ console.log("\n── the wave across the elapsed tick ──");
 	const textBefore = line.textContent;
 	ok("the wave drew its per-token items", before.length > 0, String(before.length));
 	clock += 1000;
+	shownLabel(m, "深度求索中，用时 2秒 ···");
 	m.timers[0]();
 	const after = line.querySelectorAll(".tq-waveItem");
 	ok("the elapsed tick did not rebuild them", after.length === before.length && after.every((node, i) => node === before[i]),

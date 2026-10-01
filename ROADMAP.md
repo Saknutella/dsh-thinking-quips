@@ -67,7 +67,37 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.9.0 — Colour presets & the contrast promise (current)
+## 0.9.1 — The elapsed clock stops inheriting the previous turn (current)
+
+The time beside the quip could be the previous turn's age (a user saw "used 3h 24m" on a turn that
+had just started), and the first attempt at fixing that made it restart at zero on every page
+refresh while the shell's own line kept the right number — the user's second report, and their
+question: "your clock and the real one disagree; why not just use the shell's own?"
+
+- [x] **The shell's own clock is the primary source** — DSH knows the running turn's start (it reads
+      it from its own store) and rewrites its label (`深度求索中，用时 10分46秒 ···` / `Deep diving
+      for …`) once a second. The plugin hides that label while it owns the line but never removes it,
+      so the authoritative number stays in the DOM: `durationFromText`/`labelDuration` read it back
+      with the same unit vocabulary the plugin formats with, and `elapsedFrom` prefers it over
+      everything else. That is what makes the plugin's line and the shell's line agree, and it is the
+      only one of the three sources that survives a page refresh (a refresh re-mounts the plugin but
+      not the shell's store) — measured from the report where the plugin read 8m 27s while the shell
+      read 10m 46s, the difference being exactly the time since that refresh.
+- [x] **The seat and the self-timer stay as fallbacks** — a shell whose label is missing or carries
+      no duration falls back to the `turnTail` seat, then to the self-timer. The seat rules stay
+      (only an `open` turn may set the clock; a `start.time` that is not a finite number is refused;
+      an older turn can never move it backwards; a held turn that closes gives it back), because that
+      seat is rendered once per turn tail and a finished turn's tail stays mounted — which is the
+      "used 3h 24m" bug this release opened with.
+- [x] **The DOM never drops the official clock** — the first attempt cleared it on the first pass
+      that missed the running line; a refresh re-mounts that line, the seat does not re-run for a
+      DOM-only change, and so the start was gone for the rest of the turn and the clock restarted at
+      zero. Leaving the line now resets only the self-timer. `test-adapt-02.mjs` pins the precedence
+      ("the shell's own duration wins over the seat's start") and "a line that leaves never drops the
+      official clock"; `test/test-clock.mjs` pins the parser, the precedence chain and the seat
+      rules. Each half is mutation-checked — ignoring the label, breaking the parser, and skipping
+      the close-clear each fail a named assertion.
+## 0.9.0 — Colour presets & the contrast promise
 
 Four one-click colours, a promise the plugin used to make and did not always keep, and two
 tests that could not have caught either.
@@ -254,9 +284,10 @@ the settings nav, and stop the running line's own re-renders from interrupting w
       its alias `official`) renders DSH's own `TextShimmer` through a small React root
       instead of reimplementing the sweep. `glow` keeps the pre-0.2 painted gradient, on
       the plugin's own node.
-- [x] **Elapsed time** — `conversation.chat.turnTail` (official, session-scoped) is
-      mounted while the turn is open and hands over `turn.start.time`, so the clock uses
-      the official start with a self-timer fallback. Inline folds the duration into the
+- [x] **Elapsed time** — `conversation.chat.turnTail` (official, session-scoped) hands over
+      `turn.start.time`. It turned out to be rendered **once per turn tail** — finished turns
+      included, and their tails stay mounted — which is why 0.9.1 had to constrain it to an open
+      turn; the clock uses that official start with a self-timer fallback. Inline folds the duration into the
       animated text (the 0.2 shape); separate renders it as a tertiary-grey note outside
       the animation (the 0.1 shape); off hides it. The format matches DSH's
       `formatRunDuration` (verified over 13 inputs in both locales).
@@ -313,7 +344,11 @@ the settings nav, and stop the running line's own re-renders from interrupting w
       the pinned value, not by the `>= MIN_CONTRAST` comparisons — so the guard disappears the day
       those premises do. A literal `4.5` in at least one assertion would make it independent.
 
-## Non-goals
+- [ ] **Two limits of reading the shell's clock** (recorded, neither reachable in the two shipped
+      shapes). The parse knows the two locales DSH ships (`小时/分/秒` and `h/m/s`), so a third one
+      would fall back to the seat — still the same turn start, just not the same rendering; and a
+      shell that rendered a `runningText` label without `data-chat-running` would let the plugin
+      read its own line, so `labelDuration` could skip labels inside its own `.tq-line`.## Non-goals
 
 Deliberately **not** planned — they belong to a different, heavier kind of plugin:
 

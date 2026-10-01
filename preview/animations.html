@@ -1296,16 +1296,133 @@ window.__ModuleLoader__.load({
 		* Turn facts published by this plugin's headless occupant of DSH's official
 		* `conversation.chat.turnTail` seat.
 		*
-		* That seat is mounted while the turn is still open and receives the turn's
-		* `TurnLocation`, which is where the authoritative `start.time` (the very field
-		* DSH's own clock uses) comes from — so the plugin does not have to derive it, and
-		* does not need to know which session it is looking at.
+		* That seat hands over a turn's `TurnLocation`, which is where the authoritative
+		* `start.time` (the very field DSH's own clock uses) comes from — so the plugin does
+		* not have to derive it, and does not need to know which session it is looking at.
+		*
+		* WHY THIS SLOT NEEDS RULES (measured on DSH 0.2.0-rc.2): the seat is NOT "the open
+		* turn". The shell renders it from `TurnTailNodeView`, i.e. once per turn tail in the
+		* transcript, and a finished turn's tail stays mounted — so the slot is written by
+		* every turn in the conversation, newest and oldest alike. DSH's own running clock
+		* reads the latest turn and only uses it while `turn.status === "open"`
+		* (`ChatView.runningStartTime`); {@link recordTurnClock} applies the same two rules.
+		* Without them the slot keeps the last finished turn's start, and a turn that began
+		* seconds ago reports the age of the previous one — the reported "used 3h 24m" bug.
 		*/
 		const officialTurn = { turn: undefined, startTime: undefined };
 		/** Self-timed fallback: when the running line appeared, if no official time is known. */
 		let selfStart = 0;
 		/** Forget the self-timer (called when the running line leaves the document). */
 		function resetSelfClock() { selfStart = 0; }
+		/**
+		* Offer a turn from the `turnTail` seat, or refuse it.
+		*
+		* Refused when the turn is not open (a finished turn has no running clock — DSH's own
+		* rule), when it carries no finite `start.time`, or when it would move the clock
+		* backwards past an open turn already in the slot (an older tail re-mounting after a
+		* scroll or a session switch must not win).
+		* @param turn - the `TurnLocation.turn` handed to the seat, or undefined.
+		* @returns whether the slot now describes this turn.
+		*/
+		function recordTurnClock(turn) {
+			if (turn === void 0 || turn === null) return false;
+			const start = turn.start === void 0 ? undefined : turn.start.time;
+			const open = turn.status === "open" && typeof start === "number" && Number.isFinite(start);
+			if (!open) {
+				// The turn this slot holds has just stopped being open: its own tail re-renders at
+				// turn/end, and that is the one moment the seat can tell the plugin the clock is
+				// over. Clearing from here (and not from a DOM event) is what keeps a refresh in
+				// the middle of a turn correct — the seat does not re-run when only the DOM moved.
+				if (officialTurn.turn !== undefined && String(officialTurn.turn) === String(turn.turn)) clearTurnClock();
+				return false;
+			}
+			// Newest open turn wins: an older tail re-mounting must not move the clock backwards.
+			if (officialTurn.turn !== undefined && typeof officialTurn.startTime === "number" && start < officialTurn.startTime) return false;
+			officialTurn.turn = turn.turn;
+			officialTurn.startTime = start;
+			selfStart = 0; // the official start supersedes the self-timer
+			return true;
+		}
+		/** Forget the official clock when it is this turn's (its seat went away). */
+		function releaseTurnClock(number) {
+			if (officialTurn.turn === number) {
+				officialTurn.turn = undefined;
+				officialTurn.startTime = undefined;
+			}
+		}
+		/** Forget the official clock, whoever it described. */
+		function clearTurnClock() {
+			officialTurn.turn = undefined;
+			officialTurn.startTime = undefined;
+		}
+		/**
+		* Pull a duration out of a shell label.
+		*
+		* The shell ships two locales and {@link DURATION_UNITS} already mirrors both unit rows, so
+		* the pattern is derived from the same vocabulary the plugin formats with: `3小时24分32秒`
+		* and `3h 24m 32s`. The seconds group is required because both shapes always end in seconds
+		* (`45秒` / `45s`), which is what keeps a stray number elsewhere in the label from matching.
+		* @param text - the label text.
+		* @returns elapsed ms, or undefined when the text carries no duration.
+		*/
+		function durationFromText(text) {
+			if (typeof text !== "string" || text === "") return undefined;
+			const m = /(?:(\d+)\s*(?:小时|h))?\s*(?:(\d+)\s*(?:分|m))?\s*(?:(\d+)\s*(?:秒|s))/.exec(text);
+			if (m === null) return undefined;
+			const hours = m[1] === undefined ? 0 : Number(m[1]);
+			const minutes = m[2] === undefined ? 0 : Number(m[2]);
+			const seconds = m[3] === undefined ? 0 : Number(m[3]);
+			if (!Number.isFinite(hours) || !Number.isFinite(minutes) || !Number.isFinite(seconds)) return undefined;
+			return ((hours * 60 + minutes) * 60 + seconds) * 1000;
+		}
+		/**
+		* The elapsed time the shell itself is displaying.
+		*
+		* WHY READ THE SHELL'S OWN CLOCK instead of deriving one: DSH knows the running turn's start
+		* (it reads it from its own store) and rewrites that label once a second, so its text is the
+		* authoritative value — and unlike the plugin's own clocks it survives a page refresh, which
+		* re-mounts the plugin but not the shell's store. The plugin hides that label with CSS while
+		* it owns the line; it is never removed, so it stays readable. Measured from a user report:
+		* the plugin's own clock read 8m 27s while the shell's own line read 10m 46s, the difference
+		* being exactly the time since the refresh.
+		* @param host - the running line element.
+		* @returns elapsed ms, or undefined when the label is absent or carries no duration.
+		*/
+		function labelDuration(host) {
+			if (host === null || host === undefined || typeof host.querySelector !== "function") return undefined;
+			let label = null;
+			try { label = host.querySelector('[class*="runningText"]'); } catch (_) { label = null; }
+			if (label === null || label === undefined) return undefined;
+			let text = "";
+			try { text = String(label.textContent || ""); } catch (_) { text = ""; }
+			const fromText = durationFromText(text);
+			if (fromText !== undefined) return fromText;
+			// The shell mirrors the same string onto a decoration copy through `data-shimmer-text`
+			// (that is what its `::after` paints), so read that when the text nodes are empty.
+			try {
+				const copy = label.querySelector("[data-shimmer-text]");
+				if (copy !== null && copy !== undefined && typeof copy.getAttribute === "function") {
+					return durationFromText(String(copy.getAttribute("data-shimmer-text") || ""));
+				}
+			} catch (_) { /* fall through */ }
+			return undefined;
+		}
+		/**
+		* Elapsed ms for the line on screen, best source first.
+		*
+		* 1. the shell's own label — authoritative and refresh-proof ({@link labelDuration});
+		* 2. the official start from the `turnTail` seat ({@link elapsedMs}), for a shell whose
+		*    label is missing or carries no duration;
+		* 3. the self-timer — the pre-0.7.0 fallback and the last resort.
+		* @param host - the running line element.
+		* @param now - `Date.now()`.
+		* @returns elapsed ms, never negative.
+		*/
+		function elapsedFrom(host, now) {
+			const shown = labelDuration(host);
+			if (typeof shown === "number") return Math.max(0, shown);
+			return elapsedMs(now);
+		}
 		/**
 		* Elapsed milliseconds for the turn on screen.
 		* @param now - `Date.now()`.
@@ -1349,26 +1466,24 @@ window.__ModuleLoader__.load({
 			return make(text, formatDuration(ms, locale));
 		}
 		/**
-		* Headless occupant of `conversation.chat.turnTail`. The shell mounts it while the
-		* turn is open and hands over that turn's location; it publishes the official start
-		* time and renders nothing.
-		* @param props.turn - official `TurnLocation` for the open turn.
+		* Headless occupant of `conversation.chat.turnTail`. The shell mounts one of these per
+		* turn tail in the transcript (finished turns included), so this component does not
+		* assume it is the running turn: it offers whatever turn it was handed to
+		* {@link recordTurnClock}, which keeps only an open one, and releases its own turn on
+		* unmount. Renders nothing.
+		* @param props.turn - official `TurnLocation` for the turn this tail belongs to.
 		* @returns null (renders nothing).
 		*/
 		function TurnClockBridge({ turn }) {
 			const number = turn === void 0 ? undefined : turn.turn;
+			const status = turn === void 0 ? undefined : turn.status;
 			const start = turn === void 0 || turn.start === void 0 ? undefined : turn.start.time;
+			// Re-run on the fields that decide acceptance: a tail mounted while its turn was
+			// still closed must reach the rules again when that turn opens.
 			react.useEffect(() => {
-				officialTurn.turn = number;
-				officialTurn.startTime = typeof start === "number" ? start : undefined;
-				selfStart = 0; // the official start supersedes the self-timer
-				return () => {
-					if (officialTurn.turn === number) {
-						officialTurn.turn = undefined;
-						officialTurn.startTime = undefined;
-					}
-				};
-			}, [number, start]);
+				recordTurnClock(turn);
+				return () => releaseTurnClock(number);
+			}, [number, status, start]);
 			return null;
 		}
 
@@ -3530,7 +3645,10 @@ window.__ModuleLoader__.load({
 				const host = runningStatus();
 				if (host === null) {
 					if (lastHost !== null) {
-						// The turn ended: drop the React roots and let the next turn re-time itself.
+						// The line left the document, so this turn has no clock of its own any
+						// more. Only the SELF-timer is dropped here: the official start is the
+						// seat's to give and take (a refresh re-mounts the line but not the seat),
+						// and the shell's own label outlives both — see `elapsedFrom`.
 						unmountOfficial();
 						unmountLoaderIcon();
 						resetSelfClock();
@@ -3569,11 +3687,11 @@ window.__ModuleLoader__.load({
 				const locale = effectiveLang(activeLocale);
 				if (mode === "inline") {
 					clearClock(host);
-					applyStatusText(host, withInlineClock(quip, elapsedMs(now), locale), cfg);
+					applyStatusText(host, withInlineClock(quip, elapsedFrom(host, now), locale), cfg);
 					return;
 				}
 				applyStatusText(host, quip, cfg);
-				if (mode === "separate") renderClock(host, elapsedMs(now), locale);
+				if (mode === "separate") renderClock(host, elapsedFrom(host, now), locale);
 				else clearClock(host);
 			};
 			const timer = setInterval(() => {
@@ -3659,10 +3777,12 @@ window.__ModuleLoader__.load({
 					locale: DICT_NS,
 					inject: () => ({})
 				}, QuipsSettingsPanel));
-				// DSH mounts `conversation.chat.turnTail` while a turn is open and hands over
-				// that turn's location, so this headless occupant is how the plugin learns the
-				// official start time (`turn.start.time`) without knowing which session is
-				// on screen. Absent seat on an older shell: the self-timer covers it.
+				// DSH renders `conversation.chat.turnTail` once per turn tail in the transcript
+				// — finished turns included, and their tails stay mounted — so this headless
+				// occupant is mounted many times and must not treat its turn as the running
+				// one. It hands every turn it sees to `recordTurnClock`, which keeps only an
+				// open turn and never lets an older start win; the self-timer covers the gap
+				// before the open turn's tail arrives, and an older shell (no seat) entirely.
 				ctx.slots.inject("conversation.chat.turnTail", () => ctx.slots.register({
 					name: "conversation.chat.turnTail",
 					id: "thinking-quips-clock",
@@ -3713,6 +3833,15 @@ exports.__internal = {
 			formatDuration,
 			withInlineClock,
 			officialTurn,
+			elapsedMs,
+			recordTurnClock,
+			releaseTurnClock,
+			clearTurnClock,
+			durationFromText,
+			labelDuration,
+			elapsedFrom,
+			resetSelfClock,
+			TurnClockBridge,
 			SPEED_LEVELS,
 			SPEED_ORDER,
 			SURFACES,
