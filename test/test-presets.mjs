@@ -135,11 +135,14 @@ const readStored = () => JSON.parse(storage.get(api.STORAGE_KEY));
 console.log("── the shipped preset table ──");
 const presets = api.COLOR_PRESETS;
 const ids = presets.map((p) => p.id);
-eq("the four presets, in order", ids.join(","), "blue,violet,teal,amber");
+eq("the presets, in order", ids.join(","), "blue,violet,teal,amber,rainbow");
 ok("ids are unique", new Set(ids).size === ids.length, `${ids.length} ids`);
-ok("every preset carries a parseable base colour",
-	presets.every((p) => api.parseCssColor(p.base) !== null),
+ok("every chromatic preset carries a parseable base colour",
+	presets.every((p) => p.base === null || api.parseCssColor(p.base) !== null),
 	presets.map((p) => `${p.id}=${p.base}`).join(" "));
+// The rainbow is the one entry with no base: it is a sentinel, and the stylesheet paints it.
+ok("exactly one preset is the sentinel one, and it is the rainbow",
+	presets.filter((p) => p.base === null).length === 1 && presets.filter((p) => p.base === null)[0].id === "rainbow");
 ok("every preset carries its own label key (id and key cannot drift)",
 	presets.every((p) => typeof p.key === "string" && p.key === "quips.preset." + p.id),
 	presets.map((p) => `${p.id}→${p.key}`).join(" "));
@@ -167,6 +170,7 @@ for (const [label, bg] of BACKGROUNDS) {
 		const cr = api.contrastRatio(color, bg);
 		(measured[preset.id] = measured[preset.id] || {})[label] = `${color} ${cr.toFixed(2)}:1`;
 		ok(`${label} / ${preset.id}: ${color}`, cr >= api.MIN_CONTRAST - 0.02, `contrast ${cr.toFixed(2)}:1 (need ${api.MIN_CONTRAST})`);
+		if (preset.base === null) continue; // the rainbow has no single hue to keep; its six stops are checked below
 		const hs = api.rgbToHsl(preset.base);
 		const ho = api.rgbToHsl(color);
 		ok(`${label} / ${preset.id}: hue kept`, Math.abs(ho.h - hs.h) < 3, `${hs.h.toFixed(1)}° → ${ho.h.toFixed(1)}°`);
@@ -216,6 +220,8 @@ for (const preset of presets) {
 			patch !== null && patch.colorTheme === false, JSON.stringify(patch));
 		if (preset.id === "blue") {
 			eq(`blue @ ${bg}: writes the shimmer sentinel`, patch.color, api.SHIMMER);
+		} else if (preset.id === "rainbow") {
+			eq(`rainbow @ ${bg}: writes the rainbow sentinel`, patch.color, api.RAINBOW);
 		} else {
 			eq(`${preset.id} @ ${bg}: writes the fitted hex`, patch.color, api.presetColor(preset.id, bg));
 		}
@@ -232,10 +238,12 @@ for (const preset of presets) {
 	ok(`${preset.id}: the page renders a chip for it`, chip !== null);
 	ok(`${preset.id}: the chip asks the dictionary for its label`, keys.indexOf(preset.key) !== -1,
 		keys.filter((k) => k.indexOf("quips.preset.") === 0).join(", "));
-	ok(`${preset.id}: the chip carries a painted preview`, chip !== null && typeof (chip.p.children[0].p.style || {}).backgroundColor === "string",
-		chip === null ? "no chip" : JSON.stringify(chip.p.children[0].p.style));
+	const chipStyle = chip === null ? {} : (chip.p.children[0].p.style || {});
+	ok(`${preset.id}: the chip carries a painted preview`,
+		typeof chipStyle.backgroundColor === "string" || typeof chipStyle.backgroundImage === "string",
+		JSON.stringify(chipStyle));
 	press(chip);
-	const want = preset.id === "blue" ? api.SHIMMER : api.presetColor(preset.id, "#ffffff");
+	const want = preset.id === "blue" ? api.SHIMMER : preset.id === "rainbow" ? api.RAINBOW : api.presetColor(preset.id, "#ffffff");
 	const stored = plugin.__internal.store().get();
 	eq(`${preset.id}: store color`, stored.color, want);
 	eq(`${preset.id}: store colorTheme (follow OFF)`, stored.colorTheme, false);
@@ -286,7 +294,7 @@ for (const preset of presets) {
 	press(chipFor(panelOf(plugin).nodes, preset.id));
 	const stored = plugin.__internal.store().get();
 	eq(`${preset.id}: follow is off`, stored.colorTheme, false);
-	eq(`${preset.id}: colour replaced`, stored.color, preset.id === "blue" ? api.SHIMMER : api.presetColor(preset.id, "#16181d"));
+	eq(`${preset.id}: colour replaced`, stored.color, preset.id === "blue" ? api.SHIMMER : preset.id === "rainbow" ? api.RAINBOW : api.presetColor(preset.id, "#16181d"));
 	ok(`${preset.id}: the follow state is gone from the page too`,
 		panelOf(plugin).keys.indexOf("quips.following") === -1,
 		"no follow label left");
@@ -309,6 +317,86 @@ console.log("\n── localStorage round trip ──");
 	const pressed = chipsOf(panelOf(fresh).nodes).filter((n) => n.p["aria-pressed"] === true).map((n) => n.p["data-tq-preset"]);
 	eq("the reloaded config selects the same chip", pressed.join(","), "amber");
 	ok("the two instances are different objects (the reload really was fresh)", first !== fresh);
+}
+
+// ── the rainbow: a sentinel, a static chip, a flowing line ───────────────────
+console.log("\n── the rainbow preset ──");
+{
+	ok("__internal exposes the rainbow seams",
+		typeof api.rainbowStops === "function" && typeof api.rainbowGradient === "function"
+		&& typeof api.rainbowCSS === "function" && typeof api.presetSwatch === "function" && api.RAINBOW === "rainbow");
+	for (const [label, bg] of BACKGROUNDS) {
+		const stops = api.rainbowStops(bg);
+		eq(`rainbow @ ${label}: six stops`, stops.length, 6);
+		// The whole promise of this plugin's colour work, applied to a spectrum: a glyph may sit
+		// anywhere in the gradient, so EVERY stop has to clear the floor, not just the average.
+		const worst = Math.min(...stops.map((c) => api.contrastRatio(c, bg)));
+		ok(`rainbow @ ${label}: every stop clears ${api.MIN_CONTRAST}`, worst >= api.MIN_CONTRAST - 0.02,
+			`worst ${worst.toFixed(2)}:1 — ${stops.join(", ")}`);
+		const gradient = api.rainbowGradient(bg);
+		ok(`rainbow @ ${label}: the chip gradient tiles seamlessly (every stop twice)`,
+			gradient.indexOf("linear-gradient(90deg, ") === 0 && stops.every((c) => gradient.split(c).length === 3),
+			gradient.slice(0, 72) + "…");
+		const css = api.rainbowCSS(bg);
+		ok(`rainbow @ ${label}: the stylesheet cycles the line's colour`,
+			css.indexOf("animation:tq-rainbow-ink calc(6s / var(--tq-speed,1)) linear infinite !important") !== -1
+			&& css.indexOf(".tq-line,.tq-wave{") !== -1,
+			"a colour animation on the line and on the wave");
+		ok(`rainbow @ ${label}: the icon cycles with the line`,
+			(css.match(/animation:tq-rainbow-ink/g) || []).length === 3
+			&& css.indexOf("@keyframes tq-rainbow-ink{") !== -1 && stops.every((c) => css.indexOf("color:" + c) !== -1),
+			"line + wave + icon, one keyframe set");
+		// THE REGRESSION GUARD for the bug a user hit: the first version painted a clipped gradient
+		// and made the line transparent. The shell renders its label through a PSEUDO-ELEMENT
+		// (`::after { content: attr(data-shimmer-text) }`), which a clipped ancestor background does
+		// not reach — the text vanished and only the icon was left. So the sheet must not use any
+		// fill/clip trick at all: `color` inherits into the pseudo-element and cannot hide it.
+		ok(`rainbow @ ${label}: the text is never made transparent or clipped`,
+			css.indexOf("text-fill-color") === -1 && css.indexOf("background-clip") === -1 && css.indexOf("background-image") === -1,
+			"no fill/clip tricks in the rainbow sheet");
+		// A WHITELIST, not a blacklist: the only colours this sheet may name are the six fitted
+		// stops. A blacklist needs a new word for every way of hiding text — an independent
+		// verification kept the six stops and added `0%{color:transparent}` and no assertion caught
+		// it, which is the same "the text disappears" symptom this feature already had once.
+		const named = [...css.matchAll(/color:([^;}!]+)/g)].map((m) => m[1].trim());
+		ok(`rainbow @ ${label}: every colour the sheet names is a fitted stop`,
+			named.length > 0 && named.every((c) => stops.indexOf(c) !== -1),
+			`${named.length} colour(s): ${named.join(", ")}`);
+		// `animation:none` alone is not enough: it leaves DSH's own colour, so the line stops being a
+		// rainbow at all (measured in a browser: it fell back to the shell's brand blue). Reduced
+		// motion must freeze the spectrum at its leading stop, which is fitted like every other one.
+		ok(`rainbow @ ${label}: reduced motion freezes the colour at the leading stop`,
+			css.indexOf("@media (prefers-reduced-motion:reduce)") !== -1
+			&& css.indexOf("animation:none !important;color:" + stops[0] + " !important") !== -1,
+			"frozen at " + stops[0]);
+	}
+	// The chip is the one place the spectrum must NOT move: it is a label on a button, and a
+	// moving target is a worse control than a still one. The line is where the colour flows.
+	const swatch = api.presetSwatch("rainbow", "#ffffff");
+	ok("the rainbow chip paints a static gradient",
+		swatch !== null && typeof swatch.backgroundImage === "string" && swatch.backgroundColor === undefined,
+		JSON.stringify(swatch));
+	ok("a hex preset still paints a flat colour",
+		typeof (api.presetSwatch("teal", "#ffffff") || {}).backgroundColor === "string");
+	eq("an unknown id has no swatch", api.presetSwatch("nope", "#ffffff"), null);
+	ok("the rainbow is selected only by its own sentinel",
+		api.presetActive("rainbow", api.RAINBOW, "#ffffff") === true
+		&& api.presetActive("rainbow", "#123456", "#ffffff") === false);
+
+	setTheme("#ffffff");
+	const plugin = pluginWith({ color: api.SHIMMER, colorTheme: false });
+	const chip = chipFor(panelOf(plugin).nodes, "rainbow");
+	ok("the page renders a rainbow chip with the gradient on its dot",
+		chip !== null && typeof chip.p.children[0].p.style.backgroundImage === "string",
+		chip === null ? "no chip" : JSON.stringify(chip.p.children[0].p.style));
+	press(chip);
+	eq("clicking it saves the sentinel", plugin.__internal.store().get().color, api.RAINBOW);
+	eq("and the sentinel reaches storage", readStored().color, api.RAINBOW);
+	const fresh = loaded.factory(requireStub);
+	eq("a fresh instance reads the sentinel back as-is (no colour parsing involved)",
+		fresh.__internal.loadConfig().color, api.RAINBOW);
+	const pressed = chipsOf(panelOf(fresh).nodes).filter((n) => n.p["aria-pressed"] === true).map((n) => n.p["data-tq-preset"]);
+	eq("and the reloaded config selects the rainbow chip", pressed.join(","), "rainbow");
 }
 
 console.log(failures === 0 ? "\nALL PRESET CHECKS PASSED" : `\nPRESET CHECKS FAILED: ${failures}`);

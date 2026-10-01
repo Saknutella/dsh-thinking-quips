@@ -67,7 +67,39 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.9.1 — The elapsed clock stops inheriting the previous turn (current)
+## 0.10.0 — A rainbow that still keeps the contrast promise (current)
+
+- [x] **A fifth preset, and it is not a colour** — `rainbow` is a sentinel like `shimmer`: the config
+      stores the word and the stylesheet animates the line's **colour** through six fitted stops, icon
+      included. The chip is the one place it holds still (a moving target is a worse control than a
+      still one), so the button shows the whole spectrum as a **static** gradient while the status
+      line's colour cycles.
+- [x] **…and the obvious implementation was wrong** — the first version painted a *clipped* gradient
+      (`background-clip: text` plus a transparent fill). Every structural check passed and the flow
+      was measured moving in a browser, yet in the real shell the text **disappeared and only the icon
+      was left** (reported by the user): DSH renders its visible label through a pseudo-element
+      (`<span class="text" data-shimmer-text="…"></span>` plus
+      `::after { content: attr(data-shimmer-text) }`), and a clipped background on the ancestor does
+      not paint pseudo-element glyphs. Animating `color` inherits into that pseudo-element and cannot
+      hide it, whatever the effect is. The browser probe now asserts the **glyph colour and the
+      pseudo-element's content**, not just the shape of the CSS — the check that would have caught it.
+- [x] **Every stop is fitted, not just the first** — `rainbowStops(bg)` puts each of the six hues
+      through the same fit-then-floor pipeline as a flat preset (`fitToTheme` → `readableOn`), so no
+      colour the line can pass through is below 4.5:1. Measured over the same backgrounds the presets
+      use: worst stop 4.51:1 (white; mid-grey is a hair better at 4.51). A rainbow was the obvious way
+      to break the promise the other four keep; this is why it does not.
+- [x] **The motion obeys the plugin's own rules** — the cycle reads `--tq-speed`, so Slow/Normal/Fast
+      scale it with every other animation; `prefers-reduced-motion: reduce` freezes it **at the
+      leading stop** instead of dropping it, because `animation: none` on its own leaves the shell's
+      own colour — measured: the line fell back to DSH's brand blue and stopped being a rainbow at all.
+      The icon cycles with the line, and a theme switch re-fits the stops against the background that
+      is on screen. `test/test-presets.mjs` pins the stops' contrast per background, the six-stop
+      keyframes, the "no transparent fill / no clipped background" rule (the bug above), the
+      frozen-at-the-leading-stop rule, the static chip and the sentinel's storage round-trip;
+      mutations that drop the floor, the reduced-motion rule, the chip gradient or the sentinel each
+      fail a named assertion.
+
+## 0.9.1 — The elapsed clock stops inheriting the previous turn
 
 The time beside the quip could be the previous turn's age (a user saw "used 3h 24m" on a turn that
 had just started), and the first attempt at fixing that made it restart at zero on every page
@@ -348,7 +380,9 @@ the settings nav, and stop the running line's own re-renders from interrupting w
       shapes). The parse knows the two locales DSH ships (`小时/分/秒` and `h/m/s`), so a third one
       would fall back to the seat — still the same turn start, just not the same rendering; and a
       shell that rendered a `runningText` label without `data-chat-running` would let the plugin
-      read its own line, so `labelDuration` could skip labels inside its own `.tq-line`.## Non-goals
+      read its own line, so `labelDuration` could skip labels inside its own `.tq-line`.
+
+## Non-goals
 
 Deliberately **not** planned — they belong to a different, heavier kind of plugin:
 

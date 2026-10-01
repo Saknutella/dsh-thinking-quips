@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.9.1` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.10.0` · a **DSH bundle** (install-and-go) · web client plugin
 
 **Lightweight personalisation for the DeepSeek Harness status line** — the line the
 conversation shows while the agent is working (DSH's default `Deep diving...`).
@@ -28,11 +28,14 @@ packages are **not** modified.
   `# English` sections and edited in a small modal; the **Language** control picks
   which section shows (Follow UI, English only, Chinese only, or Mixed).
 - **Font colour** — preview swatch, hex, RGB, or the native colour wheel.
-- **Colour presets** — brand blue, violet, teal, amber, one click each. Every chip is fitted
-  to the background that is on screen and floored at 4.5:1, so the same chip stays legible
-  in the light *and* the dark theme, and picking one stops **Match theme** from following
-  (you named a colour). Brand blue writes the plugin's default sentinel, so "brand blue"
-  still means DSH's own default rather than an override of it.
+- **Colour presets** — brand blue, violet, teal, amber and **rainbow**, one click each. Every chip
+  is fitted to the background that is on screen and floored at 4.5:1, so the same chip stays legible
+  in the light *and* the dark theme, and picking one stops **Match theme** from following (you named
+  a colour). Brand blue writes the plugin's default sentinel, so "brand blue" still means DSH's own
+  default rather than an override of it. **Rainbow** cycles the line's colour — icon included —
+  through six colours that are each fitted and floored, so the promise holds at every moment of the
+  cycle, while the chip itself stays a still spectrum; the cycle follows Slow / Normal / Fast and
+  freezes at the first colour when the system asks for reduced motion.
 - **Sweep brightness** — 0–100%, how much brighter the official sweep's moving highlight is
   than the text (0% makes it the text colour, i.e. an invisible sweep; 100% is white). It
   writes the token the official `TextShimmer` paints that highlight with.
