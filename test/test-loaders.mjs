@@ -272,9 +272,11 @@ const ringBox = rule(".tq-loader-ring");
 const ringSvgCss = rule(".tq-loader-ring svg");
 const ringTrack = rule(".tq-loader-ring .tq-ringTrack");
 const ringArc = rule(".tq-loader-ring .tq-ringArc");
-if (!/width:16px/.test(ringBox) || !/height:16px/.test(ringBox)) throw new Error(`ring box is not 16x16: ${ringBox}`);
+// 1em = the loader's own base (16px + --dsh-content-font-delta), so the box tracks the
+// user's content font size instead of freezing at 16px (see the block at the end).
+if (!/width:1em/.test(ringBox) || !/height:1em/.test(ringBox)) throw new Error(`ring box is not 1em square: ${ringBox}`);
 if (!/display:block/.test(ringBox)) throw new Error("ring box is not block-level (width/height would not apply if it stops being a flex item)");
-if (!/width:16px/.test(ringSvgCss) || !/height:16px/.test(ringSvgCss)) throw new Error(`ring svg is not 16x16: ${ringSvgCss}`);
+if (!/width:1em/.test(ringSvgCss) || !/height:1em/.test(ringSvgCss)) throw new Error(`ring svg is not 1em square: ${ringSvgCss}`);
 if (!/overflow:visible/.test(ringSvgCss)) throw new Error("ring svg would clip its own stroke");
 if (!/animation:tq-spin/.test(ringSvgCss)) throw new Error("ring svg does not spin");
 if (!/fill:none/.test(ringTrack) || !/stroke:currentColor/.test(ringTrack)) throw new Error(`ring track is not a stroked circle: ${ringTrack}`);
@@ -585,6 +587,81 @@ console.log("\n── the native icon's sizing and its speed cue ──");
 		throw new Error(`the slow cue is ${JSON.stringify(slow)}`);
 	}
 	console.log("OK   the cue is written only off Normal, at 1.4s / speed (fast 0.7s, slow 2.8s)");
+}
+
+// The plugin's own icons are drawn on a 16px grid, but the content font size is a GLOBAL
+// user setting and DSH publishes it as --dsh-content-font-delta (= content font size - 14px);
+// DSH's own running icon is `14px + delta` wide. The plugin's icons were frozen at 16px and
+// silently ignored that, so at a 15px setting the official whale was 15px while ours stayed
+// 16px, and the gap grew with the setting. The base is now declared once as the loader's
+// font-size and every geometry is `em`: changing the setting re-sizes the icons with no JS,
+// no observer and no re-render. Mounted official nodes (stateDot / native) are deliberately
+// excluded — they size themselves and must not inherit a font-size the plugin invented.
+console.log("\n── the icons follow the content font size ──");
+{
+	const base = ".tq-loader-orbit,.tq-loader-ring,.tq-loader-pulse,.tq-loader-dots,.tq-loader-bars,.tq-loader-morph,.tq-loader-fish"
+		+ "{font-size:calc(16px + var(--dsh-content-font-delta,0px))}";
+	if (css.indexOf(base) === -1) {
+		throw new Error("the plugin's own icons do not follow --dsh-content-font-delta");
+	}
+	for (const mounted of ["stateDot", "native"]) {
+		if (base.indexOf(mounted) !== -1) throw new Error(`${mounted} must not inherit the plugin's font-size base`);
+	}
+	if (rule(".tq-loader-native:empty").indexOf("var(--dsh-content-font-delta,0px)") === -1) {
+		throw new Error("the mask branch of native still ignores the font delta");
+	}
+	// Every geometry in the plugin's own drawings has to be relative, or it silently freezes at
+	// the 16px base again the moment the user changes the setting.
+	const RELATIVE = [
+		".tq-loader-orbit", ".tq-loader-orbit i",
+		".tq-loader-ring", ".tq-loader-ring svg",
+		".tq-loader-morph", ".tq-loader-morph svg",
+		".tq-loader-fish", ".tq-loader-pulse i",
+		".tq-loader-dots", ".tq-loader-dots i",
+		".tq-loader-bars", ".tq-loader-bars i"
+	];
+	// Anchored to a rule boundary: the base rule's selector LIST ends with `.tq-loader-fish{`,
+	// so the unanchored `rule()` helper would hand back the base rule instead of the geometry.
+	const relBody = (selector) => {
+		const m = new RegExp("(?:^|\\})" + selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\{([^}]*)\\}").exec(css);
+		if (!m) throw new Error(`CSS rule not found: ${selector}`);
+		return m[1];
+	};
+	for (const selector of RELATIVE) {
+		const body = relBody(selector);
+		if (/[0-9]px/.test(body)) throw new Error(`${selector} still uses a fixed px size: ${body}`);
+	}
+	if (css.indexOf("@keyframes tq-dots{0%,100%{opacity:.25;transform:translateY(0)}50%{opacity:1;transform:translateY(-.125em)}}") === -1) {
+		throw new Error("the dots' lift is still in px, so it will not scale with the text");
+	}
+	// The equalizer's three bars: the gap and the bar width are rounded to WHOLE DEVICE PIXELS at
+	// runtime (snapBarsGeometry), because `em` geometry is 6.375 device pixels wide at a 17px base
+	// and Chromium rounds each box edge on its own — the middle bar painted 8 device pixels against
+	// the outer 6 and read as "too far left". The `em` values must stay as the no-JS fallback.
+	const barsBox = relBody(".tq-loader-bars");
+	if (barsBox.indexOf("justify-content:space-between") === -1
+		|| barsBox.indexOf("--tq-bar-w:.1875em") === -1
+		|| barsBox.indexOf("--tq-bar-gap:.125em") === -1
+		|| barsBox.indexOf("calc(3 * var(--tq-bar-w) + 2 * var(--tq-bar-gap))") === -1) {
+		throw new Error(`the equalizer lost its device-pixel-snapped geometry: ${barsBox}`);
+	}
+	if (/(^|;)gap:/.test(barsBox)) throw new Error(`the equalizer went back to an independently rounded gap: ${barsBox}`);
+	if (relBody(".tq-loader-bars i").indexOf("var(--tq-bar-w)") === -1) throw new Error("the bars ignore the snapped width");
+	if (typeof api.snapBarsGeometry !== "function") throw new Error("the device-pixel snap is not exposed for the preview");
+	console.log("OK   the equalizer snaps its bars to whole device pixels (em fallback kept)");
+	console.log("OK   the icons scale with --dsh-content-font-delta (em geometry, official nodes untouched)");
+}
+
+// The preview page applies a changed control AT ONCE through this seam instead of waiting for the
+// 600ms poll (waiting made every control look dead for up to a second). It has to exist, be safe to
+// call, and report whether a pass actually ran: exporting the inner `pass` by name instead made the
+// whole module throw `ReferenceError: pass is not defined` at load, for every consumer.
+console.log("\n── the preview seam ──");
+{
+	if (typeof api.forcePass !== "function") throw new Error("the preview seam forcePass is missing");
+	const ran = api.forcePass();
+	if (typeof ran !== "boolean") throw new Error(`forcePass must report whether it ran, got ${typeof ran}`);
+	console.log("OK   forcePass exists and is safe to call from the preview page");
 }
 
 console.log("ALL LOADER CHECKS PASSED");

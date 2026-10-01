@@ -6,7 +6,7 @@
 
 **Lightweight personalisation for the DeepSeek Harness status line** — the line the
 conversation shows while the agent is working (DSH's default `Deep diving...`).
-Rotating bilingual quips, six loading icons in three sizes, one-click theme-colour
+Rotating bilingual quips, nine loading icons in three sizes, one-click theme-colour
 matching and an optional elapsed-time readout, all in
 **Settings → Playful quips** (its own page in the settings nav, not a row under General).
 

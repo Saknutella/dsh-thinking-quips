@@ -68,8 +68,13 @@ ok("the plugin source is embedded verbatim", page.indexOf(source) !== -1);
 ok("the matrix is driven by the plugin's own loader table", page.indexOf("api.LOADER_STYLES.forEach") !== -1);
 ok("the effect rows are driven by the plugin's own effect table", page.indexOf("api.TEXT_EFFECTS.forEach") !== -1);
 ok("the loaders are painted by the plugin's own painter", page.indexOf("api.ensureLoader(") !== -1);
-ok("the effects are painted by the plugin's own painter", page.indexOf("api.applyStatusText(") !== -1);
+// Each effects row paints through its own plugin instance (one official React root per module), so
+// the call is `plugin.__internal.applyStatusText(...)` rather than `api.applyStatusText(...)`.
+ok("the effects are painted by the plugin's own painter", page.indexOf(".applyStatusText(") !== -1);
 ok("live updates go through the plugin's own config writer", page.indexOf("patchConfig(readControls())") !== -1);
+// ...and then one immediate pass. Waiting for the plugin's own 600ms poll made every control
+// look dead for up to a second after a click — the page exports `pass` in lib/client.js for this.
+ok("a changed control applies at once instead of on the next poll", page.indexOf("__internal.forcePass()") !== -1);
 ok("the mock line carries the anchor the plugin looks for", page.indexOf('data-chat-running="true"') !== -1);
 // The plugin finds its line with document.querySelector, i.e. the FIRST match in document
 // order: with the matrix first, the plugin painted a gallery cell instead of the live line

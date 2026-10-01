@@ -95,6 +95,16 @@ the settings nav, and stop the running line's own re-renders from interrupting w
       official motion (`1.4s / speed`), written only off Normal — Normal still overrides
       nothing — stopped by `prefers-reduced-motion`, and explained in the settings row while
       `native` is selected.
+- [x] **The icons follow the global font size** — the seven styles the plugin draws itself were
+      frozen on a 16px grid, so they silently ignored the one size the user can change globally.
+      DSH publishes the content font size as `--dsh-content-font-delta` (= font size − 14px) and
+      sizes its own running icon as `14px + delta`; the plugin's own drawings now declare that base
+      once (`font-size: calc(16px + var(--dsh-content-font-delta, 0px))`) and express every
+      geometry in `em`, so they grow with the text with no JS, no observer and no re-render —
+      measured 16 / 17 / 20px at delta 0 / 1 / 4. The mounted official nodes are deliberately
+      excluded (`stateDot`/`native` size themselves — the probe showed their `font-size` untouched
+      while the native *box* still tracked `14px + delta`), and `native`'s mask branch (`:empty`)
+      now includes the delta as well; it was the one place still reading `14px * scale`.
 - [x] **A face in the plugin list** — the settings inventory (内置插件) reads display metadata
       from the package WITHOUT loading the plugin, so that row used to show the raw package name
       and the panel's default artwork. It now ships `icon.svg` (36x36, transparent, the soft

@@ -274,7 +274,7 @@ export function buildPreview() {
 	// rather than rewriting selectors: the file is inlined EXACTLY as shipped (its class names are
 	// plain here — the app's bundler is what hashes them), so nothing about it is reinterpreted.
 	const shimmerStyle = assets === null || assets.shimmerCss === null ? ""
-		: `<style data-plugin="@deepseek-ai/dsh-client-ui-primitives" data-plugin-css="@deepseek-ai/dsh-client-ui-primitives/TextShimmer.module.css">@scope (.tq-shim){${assets.shimmerCss}}</style>`;
+		: `<style data-plugin="@deepseek-ai/dsh-client-ui-primitives" data-plugin-css="@deepseek-ai/dsh-client-ui-primitives/TextShimmer.module.css">@scope (.tq-shim, .tq-official){${assets.shimmerCss}}</style>`;
 
 	// The reference set for the plugin's nav glyph: DSH's own nav icons (house style) and the
 	// official running whale the glyph is taken from. Omitted (rather than faked) when the
@@ -313,14 +313,21 @@ ${origin}<br>
 <div class="bar">
 	<label>主题 <select id="scheme"><option value="light">浅色</option><option value="dark">深色</option></select></label>
 	<label>动画速度 <select id="speed"><option value="slow">慢</option><option value="normal" selected>正常</option><option value="fast">快</option></select></label>
-	<label>字体颜色 <input type="text" id="color" value="shimmer" size="10" title="shimmer 或 #rrggbb"></label>
+	<label>字体颜色
+		<select id="colorMode" title="shimmer 是 DSH 自己的品牌蓝扫光渐变（插件的默认值），不是一种具体颜色；选自定义才会用下面的取色器">
+			<option value="shimmer" selected>跟随主题（shimmer）</option>
+			<option value="custom">自定义颜色…</option>
+		</select>
+	</label>
+	<label id="colorPickRow" hidden>颜色 <input type="color" id="colorPick" value="#2e5be8"></label>
 	<label>扫光亮度 <input type="number" id="glow" value="35" min="0" max="100"></label>
 	<label><input type="checkbox" id="reduced"> 模拟 reduced-motion（仅插件的 JS 判断；CSS 那半请改系统设置后刷新）</label>
 </div>
 
 <h2>1. 完整状态行（真实轮播）</h2>
 <p class="note">这一行调用的是插件的 <code>apply()</code>：真的轮播俏皮话、真的用时、真的 600ms 重断言循环。
-下面的控件改的是插件的<b>真实配置</b>（<code>patchConfig</code>），改动会在下一轮扫描时生效。
+下面的控件改的是插件的<b>真实配置</b>（<code>patchConfig</code>），改完还会立刻触发一次插件的扫描，
+所以点完马上见效（不必等它自己的 600ms 轮询）。
 <b>这一段必须排在所有仿造行之前</b>：插件用 <code>document.querySelector("[data-chat-running]")</code> 找自己的行，
 也就是文档里的<b>第一个</b>匹配。</p>
 <div id="live" style="margin:12px 0 6px"></div>
@@ -347,8 +354,10 @@ ${origin}<br>
 
 <h2>3. 文字特效</h2>
 <p class="note">每行调用一次 <code>applyStatusText()</code>。两种特效：<code>wave</code> 完全由插件自己画；
-<code>shimmer</code> 渲染 DSH 官方的 <code>TextShimmer</code> 组件，本页没有 React 运行时，
-所以走插件的<b>降级路径</b>（纯文本，不动画）——这也正是缺种子时的真实行为。</p>
+<code>shimmer</code> 渲染 DSH 官方的 <code>TextShimmer</code> 组件 —— 本页没有 React 运行时，所以它给插件塞了
+一个<b>最小可用的替身</b>（<code>requireShim</code> 里的 <code>createElement</code> / <code>createRoot</code> /
+<code>TextShimmer</code>），让插件的<b>真实路径</b>跑起来，画出组件自己的 DOM，再由原样内联的
+<code>TextShimmer.module.css</code> 去动画化它。缺种子时插件仍会降级为纯文本（那才是真实的老外壳行为）。</p>
 <div id="effects"></div>
 <p class="note">开发者工具里 <code>window.__tqPreview</code> 就是插件的 <code>__internal</code> 接缝，可以直接调它的函数。<br>可用开发者工具检查这些行上的 <code>data-tq-owned</code> / <code>data-tq-icon</code> /
 <code>data-style</code> / <code>data-effective</code> / <code>data-scale</code>，它们就是插件在真实界面里写下的标记。
@@ -401,21 +410,77 @@ ${origin}<br>
 		return realMatchMedia ? realMatchMedia(query) : mediaStub(false, query);
 	};
 
-	/* The module shim. react/react-dom are stubbed because the page has no React: that is
-	   exactly the "older shell" situation the plugin is required to survive. The fish seed
-	   carries the two constants the builder extracted from the installed primitives, so the
-	   official logo is the real one. */
+	/* The module shim. The page has no real React — but shimmer is DSH's own TextShimmer
+	   component, so without a stand-in the plugin fell back to PLAIN TEXT and the effect could not be
+	   seen at all (reported by the user; the old shim threw on purpose). The stand-in is the smallest
+	   thing that lets the plugin's real path run: createElement boxes the call, createRoot().render()
+	   calls the component and drops the returned DOM into the plugin's box, and the stub component
+	   builds exactly the structure TextShimmer.module.css (inlined verbatim below) animates. */
 	function requireShim(name) {
-		if (name === "react") return { createElement: function () { throw new Error("no React in the preview page"); } };
+		if (name === "react") return {
+			createElement: function (type, props) {
+				return { type: type, props: props || {}, children: Array.prototype.slice.call(arguments, 2) };
+			}
+		};
 		if (name === "react/jsx-runtime") return { jsx: noop, jsxs: noop };
-		if (name === "react-dom/client") throw new Error("no react-dom in the preview page");
+		if (name === "react-dom/client") return {
+			createRoot: function (container) {
+				return {
+					render: function (element) {
+						if (!element || typeof element.type !== "function") return;
+						var props = element.props || {};
+						props.children = element.children.length ? element.children[0] : undefined;
+						var out = element.type(props);
+						if (out && out.nodeType) container.replaceChildren(out);
+					},
+					unmount: function () { container.replaceChildren(); }
+				};
+			}
+		};
 		if (name === "@deepseek-ai/dsh-client-ui-primitives") {
 			if (FISH === null) throw new Error("no seeded primitives in the preview page");
-			return { FISH_LOGO_PATH: FISH.FISH_LOGO_PATH, FISH_LOGO_VIEWBOX: FISH.FISH_LOGO_VIEWBOX };
+			var seed = { FISH_LOGO_PATH: FISH.FISH_LOGO_PATH, FISH_LOGO_VIEWBOX: FISH.FISH_LOGO_VIEWBOX };
+			// Only seeded when the real stylesheet is inlined: without it a sweep has nothing to paint.
+			if (SHIMMER_CSS !== null) seed.TextShimmer = function (props) { return shimmerNode(props && props.children); };
+			return seed;
 		}
 		throw new Error("unexpected require in the preview page: " + name);
 	}
 	function noop() {}
+	/**
+	 * The DOM the official TextShimmer renders — the same structure section 5 builds: a
+	 * data-shimmer root, the content/text pair that carries the label through its attribute (the
+	 * shipped CSS draws that copy with ::after), and the inert decoration whose .sweep >
+	 * .highlight the stylesheet animates.
+	 */
+	function shimmerNode(text) {
+		var label = text === undefined || text === null ? "" : String(text);
+		var root = document.createElement("span");
+		root.className = "root";
+		root.setAttribute("data-shimmer", "");
+		var content = document.createElement("span");
+		content.className = "content";
+		var main = document.createElement("span");
+		main.className = "text";
+		main.setAttribute("data-shimmer-text", label);
+		content.appendChild(main);
+		root.appendChild(content);
+		var decoration = document.createElement("span");
+		decoration.className = "decoration";
+		decoration.setAttribute("aria-hidden", "true");
+		var sweep = document.createElement("span");
+		sweep.className = "sweep";
+		var highlightBox = document.createElement("span");
+		highlightBox.className = "content highlight";
+		var highlight = document.createElement("span");
+		highlight.className = "text";
+		highlight.textContent = label;
+		highlightBox.appendChild(highlight);
+		sweep.appendChild(highlightBox);
+		decoration.appendChild(sweep);
+		root.appendChild(decoration);
+		return root;
+	}
 
 	/** Fresh module state, so every boot reads the config again. */
 	function boot() {
@@ -515,7 +580,14 @@ ${origin}<br>
 			row.appendChild(label);
 			row.appendChild(line);
 			host.appendChild(row);
-			api.applyStatusText(line, effect === "wave" ? "正在梳理脉络…" : "正在思考，用时 3秒 ···", {
+			// Each row gets its OWN plugin instance. The plugin keeps one official React root per
+			// module — exactly right for one running line — so a shared instance would unmount the
+			// previous row's root while painting this one, which emptied the first row's box (the
+			// whole section looked blank). One module per row = one shell per row, which is also the
+			// honest simulation: in the app there is only ever one running line per plugin instance.
+			var plugin = boot();
+			api.injectPluginCss();
+			plugin.__internal.applyStatusText(line, effect === "wave" ? "正在梳理脉络…" : "正在思考，用时 3秒 ···", {
 				textEffect: effect, color: "shimmer"
 			});
 			var target = line.querySelector(".tq-line") || line;
@@ -672,9 +744,22 @@ ${origin}<br>
 			clockMode: document.getElementById("clockMode").value,
 			indicatorOnly: document.getElementById("indicatorOnly").checked,
 			speed: document.getElementById("speed").value,
-			color: document.getElementById("color").value || "shimmer",
+			color: document.getElementById("colorMode").value === "custom"
+				? (document.getElementById("colorPick").value || "shimmer")
+				: "shimmer",
 			glow: Number(document.getElementById("glow").value) || 0
 		});
+	}
+
+	/** The picker only matters in custom mode; shimmer means DSH's own gradient, not a colour. */
+	function syncColorRow() {
+		var row = document.getElementById("colorPickRow");
+		if (!row) return;
+		var custom = document.getElementById("colorMode").value === "custom";
+		// The hidden attribute alone is not enough: the bar's own label{display:flex} wins over the
+		// UA stylesheet's [hidden] rule, so the row stayed visible in shimmer mode.
+		row.hidden = !custom;
+		row.style.display = custom ? "" : "none";
 	}
 
 	var liveLine = null;
@@ -711,10 +796,13 @@ ${origin}<br>
 		});
 	}
 
-	/** Live updates go through the plugin's own config writer; its poll re-asserts them. */
+	/** Live updates go through the plugin's own config writer, then one immediate pass. */
 	function pushConfig() {
 		if (livePlugin === null) return;
 		livePlugin.__internal.patchConfig(readControls());
+		// The plugin's own loop runs every 600ms; waiting for it made every control look dead for
+		// up to a second after a click. The pass entry is exported for exactly this (lib/client.js).
+		try { livePlugin.__internal.forcePass(); } catch (_) { /* the next poll will still apply it */ }
 	}
 
 	function fillSelect(id, values, selected, label) {
@@ -757,13 +845,23 @@ ${origin}<br>
 				if (id === "locale") bootLive(); // the locale is read once per apply()
 			});
 		});
-		["speed", "color", "glow"].forEach(function (id) {
+		["speed", "colorMode", "colorPick", "glow"].forEach(function (id) {
 			document.getElementById(id).addEventListener("change", function () {
+				syncColorRow();    // the picker only matters in custom mode
 				pushConfig();      // the plugin repaints --tq-speed / the colour for the whole document
 				buildMatrix();     // ...and the cells are rebuilt so the morph picks the new speed up
 				buildShimmer();    // the sweep's highlight follows the brightness control
 			});
+			if (id === "colorPick") {
+				// Dragging the native colour picker fires input continuously: repaint without the
+				// whole-sheet work that a change event triggers.
+				document.getElementById(id).addEventListener("input", function () {
+					pushConfig();
+					buildShimmer();
+				});
+			}
 		});
+		syncColorRow();
 		document.getElementById("reduced").addEventListener("change", function (e) {
 			forceReduced = e.target.checked;
 			buildMatrix(); // the morph decides at build time whether to animate
