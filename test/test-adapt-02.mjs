@@ -738,6 +738,58 @@ console.log("\n── DSH replaces the running line (a tool call) ──");
 	ok("the rotation still moves on its own clock", quipNow() !== shown, `${shown} -> ${quipNow()}`);
 }
 
+// ── 6f. a reload opens on a RANDOM quip, not always the first one ────────────
+console.log("\n── the opening quip is random per page load ──");
+{
+	// Reported from real use: whatever quip was showing, a refresh always came back to the same
+	// first one ("正在思考…"). The rotation origin IS the page load, so without an offset the index
+	// is 0 for the first interval — every time, on every reload.
+	const realRandom = Math.random;
+	const config = {
+		textEffect: "official",
+		clockMode: "off",
+		quipMs: 8000,
+		quips: "# Chinese\n甲\n乙\n丙\n丁"
+	};
+	/** A scripted draw sequence: the last value repeats, so an extra draw is visible. */
+	const draws = (values) => {
+		let at = 0;
+		return () => values[Math.min(at++, values.length - 1)];
+	};
+	/** Mount with a scripted draw, and report what opened along with the shipped list. */
+	const opened = async (...values) => {
+		Math.random = draws(values);
+		const m = await mount(config);
+		m.plugin.apply(m.ctx);
+		return {
+			shown: m.renders[m.renders.length - 1].element.children[0],
+			list: m.plugin.__internal.selectPhrases(m.plugin.__internal.loadConfig(), "zh"),
+			m
+		};
+	};
+	const zero = await opened(0);
+	ok("a zero draw opens on the first quip (the shape the bug always produced)",
+		zero.shown === zero.list[0], `${zero.shown} vs ${zero.list[0]} (${zero.list.length} quips)`);
+	// The SECOND value is the trap: the offset must be drawn exactly once, so 0.25 must never be
+	// used. A constant stub cannot tell "drawn once" from "drawn on every pass" — this can.
+	const high = await opened(0.75, 0.25);
+	ok("another draw opens on the index it names",
+		high.shown === high.list[Math.floor(0.75 * high.list.length)],
+		`${high.shown} (want ${high.list[Math.floor(0.75 * high.list.length)]})`);
+	ok("so the opening quip follows the draw instead of the list order",
+		high.shown !== zero.shown, `${zero.shown} vs ${high.shown}`);
+	// The rotation still advances one step per interval from wherever it opened, and it does NOT
+	// re-draw: a second draw of 0.25 would jump the quip to another slot entirely.
+	clock += 8_000;
+	high.m.timers[0]();
+	const next = high.m.renders[high.m.renders.length - 1].element.children[0];
+	ok("the rotation advances one step from the random start, without re-drawing",
+		next === high.list[(Math.floor(0.75 * high.list.length) + 1) % high.list.length],
+		`${high.shown} -> ${next} (a re-draw would show ${high.list[Math.floor(0.25 * high.list.length)]})`);
+	clock -= 8_000;
+	Math.random = realRandom;
+}
+
 // ── 6c. the wave must survive the once-a-second elapsed tick ─────────────────
 console.log("\n── the wave across the elapsed tick ──");
 {

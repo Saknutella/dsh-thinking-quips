@@ -67,7 +67,19 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.11.0 — Eight contributed sprites (current)
+## 0.11.1 — A refresh no longer opens on the same quip (current)
+
+- [x] **The rotation's opening index is random per page load** — the quip index is derived from the
+      clock (`floor(elapsed / quipMs) % count`) on purpose, so that a shell re-render cannot move the
+      text or restart the animation; but its origin is the page load, so every refresh opened on index
+      0 — the same first quip (`正在思考…`) no matter what had been showing before. The offset added
+      here is an **index**, not a millisecond phase: it stays correct when the list length or the
+      per-quip time changes, and the rotation still advances exactly one step per interval. It is
+      chosen lazily on the first pass, which is where the list length is known.
+- [x] **Pinned by a deterministic draw** — the self-check stubs `Math.random` to `0` and to `0.75` and
+      asserts the opening quip is `list[0]` and `list[floor(0.75 × count)]`, that the two differ, and
+      that the rotation then advances one step from wherever it opened.
+## 0.11.0 — Eight contributed sprites
 
 The design brief (`docs/loading图标设计需求.md` — in the repo, not in the published tarball) asks for 6–10 small
 animated icons bound to the font size, and the eight delivered files in `.sprites/loading-icons/svg-final/`
