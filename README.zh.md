@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.11.4` · **DSH bundle**（装上即用）· Web 客户端插件
+`v0.11.5` · **DSH bundle**（装上即用）· Web 客户端插件
 
 **给 DeepSeek Harness 状态行做的轻量个性化** —— 就是智能体工作时会话里显示的那一行
 （DSH 默认的 `Deep diving...`）。可轮换的中英俏皮话、十六种加载图标 × 三档尺寸、一键切换颜色预设、

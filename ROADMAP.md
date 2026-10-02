@@ -67,7 +67,31 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.11.4 — One clock for the rainbow, so switching the icon cannot desync it (current)
+## 0.11.5 — The rainbow's colouring is restored, and every copy is phase-stamped (current)
+
+- [x] **0.11.4 broke the text's rainbow — reverted, and why** — it moved the shell-token declarations
+      from `.tq-line` (a stylesheet rule the text subtree inherits) onto the wrapper as INLINE
+      `var(--tq-ink)` values. In the real shell the visible text then stopped following altogether
+      (reported: "the text has no rainbow at all" while the icon stayed green). The single-clock idea
+      was right; moving WHERE the tokens are declared was not. They are back on the line, and the
+      sheet declares `--dsw-alias-label-deep-diving` / `--dsw-alias-label-shimmer` there again.
+- [x] **The wave reads the line's ink instead of animating a third copy** — `.tq-wave` kept its own
+      `--dsw-static-deepseek-500` and stayed blue under the rainbow; it is rebuilt on every text
+      change, so giving it an animation of its own would reintroduce exactly the desync this release
+      is about. Measured after the change: wave, its items and the icon are the SAME colour.
+- [x] **Phase-stamping instead of a shared element** — two copies are unavoidable (the icon is a
+      sibling of the line and cannot inherit its animation), so each copy is given, AT CREATION, the
+      negative `animation-delay` that lands on the shared epoch's phase, with `important` priority
+      (the sheet's `animation` shorthand is `!important` and otherwise resets it — the first attempt
+      silently did nothing). Measured across a mid-turn loader change: **Δ = 0 immediately**, and
+      ≈ 7-13 RGB units (about a tenth of a second of the six-second cycle) once the two have settled,
+      against the 216/243 of whole-hue mismatch before.
+- [x] **STAMP ONCE — re-aligning later makes it worse, recorded in the code** — a per-pass aligner
+      was tried and dropped: changing `animation-delay` on a running CSS animation restarts its
+      timeline in Chromium, so every pass pushed the copies further apart (measured delay drift
+      -447ms → -4283ms → -7189ms with the drawn colour jumping each time). The note is in
+      `inkPhaseDelay`'s JSDoc so it is not re-invented.
+## 0.11.4 — One clock for the rainbow, so switching the icon cannot desync it
 
 - [x] **The animation moved onto the wrapper** — reported as "switching the icon while it is thinking
       desynchronises the colours", and reproduced through the real settings path (a loader change only

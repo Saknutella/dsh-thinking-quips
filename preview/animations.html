@@ -317,6 +317,8 @@ window.__ModuleLoader__.load({
 		* a colour that changes on its own.
 		*/
 		const RAINBOW = "rainbow";
+		/** One full pass through the rainbow stops, in milliseconds at speed 1. */
+		const RAINBOW_CYCLE_MS = 6000;
 		/**
 		* The hues that gradient walks through, in order (degrees).
 		*
@@ -1333,6 +1335,10 @@ window.__ModuleLoader__.load({
 			if (typeof document === "undefined" || typeof document.createElement !== "function") return null;
 			line = document.createElement("span");
 			line.className = LINE_CLASS;
+			// A copy of the rainbow animation that joins later must land on the shared phase, not at 0%.
+			if (typeof line.style === "object" && line.style !== null && typeof line.style.setProperty === "function") {
+				line.style.setProperty("animation-delay", inkPhaseDelay(), "important");
+			}
 			// Appended LAST on purpose: React only inserts relative to the children it
 			// manages, so a trailing node of ours is never reordered away.
 			const parent = visibleContent(host);
@@ -2686,6 +2692,9 @@ window.__ModuleLoader__.load({
 				// reduced-motion freeze are written ONCE against `.tq-loader-sprites` / `.tq-sprite`
 				// instead of once per icon (and a sprite added later inherits both).
 				span.className = "tq-loader tq-loader-" + want + (LOADER_SPRITES[want] === void 0 ? "" : " tq-loader-sprites");
+			// Same phase as the line: this span is rebuilt whenever the loader style or size changes, and
+			// without this it would restart the colour cycle at the leading stop (the reported desync).
+			span.style.setProperty("animation-delay", inkPhaseDelay(), "important");
 				span.setAttribute("data-style", requested);
 				span.setAttribute("data-effective", want);
 				span.setAttribute("data-scale", scale);
@@ -2772,6 +2781,19 @@ window.__ModuleLoader__.load({
 		}
 
 		// ── colour override ──────────────────────────────────────────────────
+		/**
+		* The instant the colour cycle is measured from, for every copy of the rainbow animation.
+		*
+		* WHY: the animation necessarily exists on more than one element — the plugin's line carries the
+		* text (and the tokens the shell's own glyphs read) while the icon is a SIBLING of it, so neither
+		* can inherit the other's animation. Two copies that simply start when their element is created
+		* drift apart the moment one of them is rebuilt: changing the loader mid-turn created a fresh icon
+		* at phase 0 next to a text seconds into its own cycle (measured Δ of 216 and 243 RGB units, which
+		* is the "switching the icon desynchronises the colours" report). Giving every copy, AT CREATION,
+		* the negative delay that lands on this epoch's phase puts them all on one clock — and because the
+		* delay is expressed in the animation's own time base, it survives a speed change too.
+		*/
+		const inkEpoch = Date.now();
 		const COLOR_STYLE_ID = "dsh-thinking-quips-color";
 		/** The plugin's own colour, re-applied to every new running line. */
 		const hostColor = { base: null, sweep: null };
@@ -2879,19 +2901,29 @@ window.__ModuleLoader__.load({
 		*/
 		function rainbowCSS(bg, glow) {
 			const stops = rainbowStops(bg);
-			const speed = "calc(6s / var(--tq-speed,1))";
+			const speed = "calc(" + RAINBOW_CYCLE_MS / 1000 + "s / var(--tq-speed,1))";
 			const at = (i) => Math.round((i / stops.length) * 100) + "%";
 			const ink = stops.map((color, i) => at(i) + "{color:" + color + ";--tq-ink:" + color + "}").join("")
 				+ "100%{color:" + stops[0] + ";--tq-ink:" + stops[0] + "}";
 			const flow = "animation:tq-rainbow-ink " + speed + " linear infinite !important";
 			const share = Math.max(0, Math.min(100, 100 - (Number.isFinite(glow) ? glow : 0)));
-			void share; // the highlight is written by paintHost as an inline `var(--tq-ink)` mix
-			// The wrapper the plugin owns (`paintHost` writes the tokens there) plus the 0.1.x status
-			// element, which is that shell's equivalent. Both contain the icon AND the text.
-			const scope = "[data-tq-owned],[role=\"status\"][class*=\"turnStatus\"]";
+			// Two copies, both PHASE-LOCKED at creation (see inkEpoch): the line carries the text and
+			// the tokens the shell's glyphs read, while the icon is its sibling and can only animate
+			// itself. Everything else reads the line's live ink instead of starting a third copy.
 			return ""
 				+ "@property --tq-ink{syntax:\"<color>\";inherits:true;initial-value:" + stops[0] + "}"
-				+ scope + "{--tq-ink:" + stops[0] + ";" + flow + "}"
+				+ ".tq-line{--tq-ink:" + stops[0]
+				+ ";--dsw-alias-label-deep-diving:var(--tq-ink)"
+				+ ";--dsw-alias-label-shimmer:color-mix(in srgb, var(--tq-ink) " + share + "%, white)"
+				+ ";" + flow + "}"
+				+ ".tq-loader{" + flow + "}"
+				// The wave is rebuilt on every text change, so it must not carry a copy of its own: it
+				// reads the line's live ink. Without this it kept its own `--dsw-static-deepseek-500`
+				// and stayed blue under the rainbow.
+				// Only the COLOUR, never a --tq-ink declaration of its own: re-declaring it re-declares the
+				// leading stop and shadows the animated value inherited from the line (measured: the wave
+				// sat on rgb(232,19,19) while the icon cycled).
+				+ ".tq-wave{color:var(--tq-ink) !important}"
 				// The shell's own base glyphs: `TextShimmer`'s `.text` carries an EXPLICIT colour
 				// rather than a token (measured: it stayed `rgb(43, 83, 199)` while the sweep followed
 				// the hue), so the token routing alone cannot reach it. `data-shimmer-text` is the
@@ -2899,8 +2931,9 @@ window.__ModuleLoader__.load({
 				// glyphs are that element's `::after`, which inherits from it.
 				+ ".tq-line [data-shimmer-text]{color:var(--tq-ink) !important}"
 				+ "@keyframes tq-rainbow-ink{" + ink + "}"
-				+ "@media (prefers-reduced-motion:reduce){" + scope
-				+ "{animation:none !important;--tq-ink:" + stops[0] + " !important}.tq-line [data-shimmer-text]{color:" + stops[0] + " !important}}";
+				+ "@media (prefers-reduced-motion:reduce){.tq-line,.tq-wave,.tq-loader,[role=\"status\"][class*=\"turnStatus\"]"
+				+ "{animation:none !important;color:" + stops[0] + " !important;--tq-ink:" + stops[0] + " !important}"
+				+ ".tq-line [data-shimmer-text]{color:" + stops[0] + " !important}}";
 		}
 		/**
 		* Apply the configured colour and sweep brightness.
@@ -2944,13 +2977,11 @@ window.__ModuleLoader__.load({
 					el.id = COLOR_STYLE_ID;
 					document.head.appendChild(el);
 				}
-				// The tokens are written as INLINE `var(--tq-ink)` references on the wrapper the
-				// animation runs on, so every descendant — the icon, the line, and DSH's own text and
-				// sweep — resolves the same live value. That is what keeps a re-created icon in phase
-				// (see rainbowCSS): it reads this instead of animating its own copy.
-				const share = Math.max(0, Math.min(100, 100 - glow));
+				// The tokens are declared in the SHEET, on the line (see rainbowCSS): an inline value on
+				// the wrapper did not reach the shell's own glyphs in the real app — the text lost its
+				// rainbow while the icon kept it. Only the sweep's brightness is written here, as before.
 				el.textContent = rainbowCSS(bg, glow);
-				tintHost("var(--tq-ink)", "color-mix(in srgb, var(--tq-ink) " + share + "%, white)");
+				tintHost(null, sweep);
 				return;
 			}
 			const legacy = "[role=\"status\"][class*=\"turnStatus\"]{background-image:linear-gradient(90deg, " + base + " 0%, " + base + " 40%, " + sweep + " 50%, " + base + " 60%, " + base + " 100%) !important}";
@@ -2964,6 +2995,23 @@ window.__ModuleLoader__.load({
 			}
 			el.textContent = legacy + own;
 			tintHost(isDefault ? null : base, sweep);
+		}
+		/**
+		* The negative `animation-delay` that puts a NEW copy of the rainbow animation at the phase the
+		* shared epoch is on now, in the animation's own (speed-scaled) time base.
+		* @returns a CSS time like "-1234.5ms", or an empty string when there is nothing to align.
+		*/
+		function inkPhaseDelay() {
+			try {
+				// IMPORTANT priority on purpose: the sheet declares the shorthand
+				// "animation: ... !important", which resets animation-delay to 0 and outranks a plain
+				// inline value - the first attempt at this stamp silently did nothing (measured delta of
+				// 218/242 after a mid-turn loader switch).
+				const speed = speedOf(store().get());
+				const cycle = RAINBOW_CYCLE_MS / speed;
+				const phase = ((Date.now() - inkEpoch) % cycle + cycle) % cycle;
+				return "-" + Math.round(phase * 1000) / 1000 + "ms";
+			} catch (_) { return ""; }
 		}
 		function effectiveHex(cfg) {
 			return cfg.color === SHIMMER || !cfg.color ? DEFAULT_BLUE : cfg.color;

@@ -338,16 +338,20 @@ console.log("\n── the rainbow preset ──");
 			gradient.indexOf("linear-gradient(90deg, ") === 0 && stops.every((c) => gradient.split(c).length === 3),
 			gradient.slice(0, 72) + "…");
 		const css = api.rainbowCSS(bg);
-		ok(`rainbow @ ${label}: the stylesheet cycles the colour ONCE, on the wrapper`,
+		ok(`rainbow @ ${label}: the line and the icon each cycle, the wave follows`,
 			css.indexOf("animation:tq-rainbow-ink calc(6s / var(--tq-speed,1)) linear infinite !important") !== -1
-			&& css.indexOf("[data-tq-owned],[role=\"status\"][class*=\"turnStatus\"]{--tq-ink:") !== -1,
-			"the animation sits on the element that contains the icon and the text");
-		ok(`rainbow @ ${label}: nothing animates a second copy`,
-			(css.match(/animation:tq-rainbow-ink/g) || []).length === 1
-			&& css.indexOf(".tq-loader{animation") === -1
-			&& css.indexOf(".tq-line,.tq-wave{animation") === -1
+			&& css.indexOf(".tq-line{--tq-ink:") !== -1
+			&& css.indexOf(".tq-wave{color:var(--tq-ink) !important}") !== -1,
+			"tokens on the line; the wave reads them instead of animating a third copy");
+		// The icon is a SIBLING of the line, so it cannot inherit the line's animation: exactly two
+		// copies are needed, and each is stamped onto the shared phase when it is created (see
+		// inkPhaseDelay) — that stamp is what a mid-turn loader change relies on. A third copy (the
+		// wave, which is rebuilt on every text change) would be the desync all over again.
+		ok(`rainbow @ ${label}: exactly two animated copies, both phase-stamped`,
+			(css.match(/animation:tq-rainbow-ink/g) || []).length === 2
+			&& css.indexOf(".tq-line{") !== -1 && css.indexOf(".tq-loader{") !== -1
 			&& css.indexOf("@keyframes tq-rainbow-ink{") !== -1 && stops.every((c) => css.indexOf("--tq-ink:" + c) !== -1),
-			"one keyframe set, one animated element — a re-created icon cannot start at phase 0");
+			"line + icon, one keyframe set, no third copy");
 		// THE REGRESSION GUARD for the bug a user hit: the first version painted a clipped gradient
 		// and made the line transparent. The shell renders its label through a PSEUDO-ELEMENT
 		// (`::after { content: attr(data-shimmer-text) }`), which a clipped ancestor background does
@@ -367,23 +371,21 @@ console.log("\n── the rainbow preset ──");
 			named.length > 0 && named.every((c) => allowed.indexOf(c) !== -1),
 			`${named.length} colour(s): ${named.join(", ")}`);
 		// The routing itself, which is what makes the icon and the shell's own text share ONE clock.
-		// The count matters as much as the shape: the first version put the animation on the line AND
-		// on the icon, so changing the loader mid-turn re-created the icon and it started at phase 0
-		// while the text kept going (measured Δ of 216/243 RGB units — the reported "switching the
-		// icon desynchronises the colours"). One animation, on the wrapper that contains both, is
-		// what makes a late-joining node read the live value instead of restarting it.
+		// The SHELL's own paint reads tokens, not `color`, so the sheet has to declare them where the
+		// text subtree can inherit them — on the line. (Writing them inline on the wrapper instead was
+		// tried and the real app's text lost its rainbow while the icon kept it.)
 		ok(`rainbow @ ${label}: the shell's own paint follows the animated colour`,
 			css.indexOf("@property --tq-ink{syntax:\"<color>\";inherits:true") !== -1
-			&& css.indexOf("[data-tq-owned],[role=\"status\"][class*=\"turnStatus\"]{--tq-ink:" + stops[0]) !== -1
-			&& (css.match(/animation:tq-rainbow-ink/g) || []).length === 1
+			&& css.indexOf("--dsw-alias-label-deep-diving:var(--tq-ink)") !== -1
+			&& css.indexOf("--dsw-alias-label-shimmer:color-mix(in srgb, var(--tq-ink)") !== -1
 			&& css.indexOf(".tq-line [data-shimmer-text]{color:var(--tq-ink) !important}") !== -1,
-			"one animation on the wrapper, a registered --tq-ink, and the base-glyph rule");
+			"a registered --tq-ink read by both tokens and by the base glyphs");
 		// `animation:none` alone is not enough: it leaves DSH's own colour, so the line stops being a
 		// rainbow at all (measured in a browser: it fell back to the shell's brand blue). Reduced
 		// motion must freeze the spectrum at its leading stop, which is fitted like every other one.
 		ok(`rainbow @ ${label}: reduced motion freezes the colour at the leading stop`,
 			css.indexOf("@media (prefers-reduced-motion:reduce)") !== -1
-			&& css.indexOf("animation:none !important;--tq-ink:" + stops[0] + " !important") !== -1
+			&& css.indexOf("animation:none !important;color:" + stops[0] + " !important;--tq-ink:" + stops[0] + " !important") !== -1
 			&& css.indexOf(".tq-line [data-shimmer-text]{color:" + stops[0] + " !important}") !== -1,
 			"frozen at " + stops[0]);
 	}
