@@ -67,7 +67,24 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.11.3 — The rainbow drives the shell's own paint too (current)
+## 0.11.4 — One clock for the rainbow, so switching the icon cannot desync it (current)
+
+- [x] **The animation moved onto the wrapper** — reported as "switching the icon while it is thinking
+      desynchronises the colours", and reproduced through the real settings path (a loader change only
+      sends `patchConfig({ loader })`): every animated element ran its OWN copy of the animation, so the
+      rebuilt icon span started at phase 0 while the text — seconds into its own copy — kept going.
+      Measured Δ of 216 RGB units 1.3s after the switch, and 243 immediately after switching to a
+      sprite (a fresh icon at the leading stop beside a violet text: the screenshot that started this).
+      Now ONE animation runs on the wrapper the plugin owns, driving a registered `--tq-ink`; the icon,
+      the line, the shell's text and its sweep all resolve that live value, so a node that joins later
+      has no animation of its own to restart. Re-measured across two mid-turn switches
+      (orbit → bars → jelly): **Δ = 0 at every sample**, with the wrapper's single clock advancing
+      (900ms → 1917ms) while the icon, the line and the glyphs report no animation at all.
+- [x] **Pinned by an assertion about the COUNT** — `test-presets.mjs` requires exactly one
+      `animation:tq-rainbow-ink` in the sheet, with no `.tq-line,.tq-wave{animation…}` and no
+      `.tq-loader{animation…}` of its own: a second copy is precisely the bug.
+
+## 0.11.3 — The rainbow drives the shell's own paint too
 
 - [x] **The icon and the text share one clock now** — reported as "with the rainbow the icon and the
       text do not transition together", and the screenshot agreed: a teal icon beside red text. The

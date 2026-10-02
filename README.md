@@ -2,7 +2,7 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.11.3` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.11.4` · a **DSH bundle** (install-and-go) · web client plugin
 
 **Lightweight personalisation for the DeepSeek Harness status line** — the line the
 conversation shows while the agent is working (DSH's default `Deep diving...`).

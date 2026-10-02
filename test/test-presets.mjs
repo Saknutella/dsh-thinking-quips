@@ -338,14 +338,16 @@ console.log("\n── the rainbow preset ──");
 			gradient.indexOf("linear-gradient(90deg, ") === 0 && stops.every((c) => gradient.split(c).length === 3),
 			gradient.slice(0, 72) + "…");
 		const css = api.rainbowCSS(bg);
-		ok(`rainbow @ ${label}: the stylesheet cycles the line's colour`,
+		ok(`rainbow @ ${label}: the stylesheet cycles the colour ONCE, on the wrapper`,
 			css.indexOf("animation:tq-rainbow-ink calc(6s / var(--tq-speed,1)) linear infinite !important") !== -1
-			&& css.indexOf(".tq-line,.tq-wave{") !== -1,
-			"a colour animation on the line and on the wave");
-		ok(`rainbow @ ${label}: the icon cycles with the line`,
-			(css.match(/animation:tq-rainbow-ink/g) || []).length === 3
-			&& css.indexOf("@keyframes tq-rainbow-ink{") !== -1 && stops.every((c) => css.indexOf("color:" + c) !== -1),
-			"line + wave + icon, one keyframe set");
+			&& css.indexOf("[data-tq-owned],[role=\"status\"][class*=\"turnStatus\"]{--tq-ink:") !== -1,
+			"the animation sits on the element that contains the icon and the text");
+		ok(`rainbow @ ${label}: nothing animates a second copy`,
+			(css.match(/animation:tq-rainbow-ink/g) || []).length === 1
+			&& css.indexOf(".tq-loader{animation") === -1
+			&& css.indexOf(".tq-line,.tq-wave{animation") === -1
+			&& css.indexOf("@keyframes tq-rainbow-ink{") !== -1 && stops.every((c) => css.indexOf("--tq-ink:" + c) !== -1),
+			"one keyframe set, one animated element — a re-created icon cannot start at phase 0");
 		// THE REGRESSION GUARD for the bug a user hit: the first version painted a clipped gradient
 		// and made the line transparent. The shell renders its label through a PSEUDO-ELEMENT
 		// (`::after { content: attr(data-shimmer-text) }`), which a clipped ancestor background does
@@ -364,22 +366,25 @@ console.log("\n── the rainbow preset ──");
 		ok(`rainbow @ ${label}: every colour the sheet names is a fitted stop`,
 			named.length > 0 && named.every((c) => allowed.indexOf(c) !== -1),
 			`${named.length} colour(s): ${named.join(", ")}`);
-		// The routing itself, which is what makes the icon and the shell's own text share ONE clock
-		// (the complaint behind it: "with the rainbow the icon and the text do not transition
-		// together" — the shell paints its glyphs from these tokens, not from `color`).
+		// The routing itself, which is what makes the icon and the shell's own text share ONE clock.
+		// The count matters as much as the shape: the first version put the animation on the line AND
+		// on the icon, so changing the loader mid-turn re-created the icon and it started at phase 0
+		// while the text kept going (measured Δ of 216/243 RGB units — the reported "switching the
+		// icon desynchronises the colours"). One animation, on the wrapper that contains both, is
+		// what makes a late-joining node read the live value instead of restarting it.
 		ok(`rainbow @ ${label}: the shell's own paint follows the animated colour`,
 			css.indexOf("@property --tq-ink{syntax:\"<color>\";inherits:true") !== -1
-			&& css.indexOf("--dsw-alias-label-deep-diving:var(--tq-ink)") !== -1
-			&& css.indexOf("--dsw-alias-label-shimmer:color-mix(in srgb, var(--tq-ink)") !== -1
-			&& css.indexOf(".tq-line [data-shimmer-text]{color:var(--tq-ink) !important}") !== -1
-			&& css.indexOf("--tq-ink:" + stops[0]) !== -1,
-			"a registered --tq-ink driven by the keyframes, read by both tokens and by the base glyphs");
+			&& css.indexOf("[data-tq-owned],[role=\"status\"][class*=\"turnStatus\"]{--tq-ink:" + stops[0]) !== -1
+			&& (css.match(/animation:tq-rainbow-ink/g) || []).length === 1
+			&& css.indexOf(".tq-line [data-shimmer-text]{color:var(--tq-ink) !important}") !== -1,
+			"one animation on the wrapper, a registered --tq-ink, and the base-glyph rule");
 		// `animation:none` alone is not enough: it leaves DSH's own colour, so the line stops being a
 		// rainbow at all (measured in a browser: it fell back to the shell's brand blue). Reduced
 		// motion must freeze the spectrum at its leading stop, which is fitted like every other one.
 		ok(`rainbow @ ${label}: reduced motion freezes the colour at the leading stop`,
 			css.indexOf("@media (prefers-reduced-motion:reduce)") !== -1
-			&& css.indexOf("animation:none !important;color:" + stops[0] + " !important") !== -1,
+			&& css.indexOf("animation:none !important;--tq-ink:" + stops[0] + " !important") !== -1
+			&& css.indexOf(".tq-line [data-shimmer-text]{color:" + stops[0] + " !important}") !== -1,
 			"frozen at " + stops[0]);
 	}
 	// The chip is the one place the spectrum must NOT move: it is a label on a button, and a

@@ -2864,6 +2864,15 @@ window.__ModuleLoader__.load({
 		* writes it alongside `color`; the two tokens then read the same live value. An engine without
 		* `@property` steps through the stops instead of interpolating, and one without `color-mix`
 		* drops the highlight declaration and keeps the static sweep written by `paintHost`.
+		*
+		* WHY THE ANIMATION LIVES ON THE WRAPPER AND NOWHERE ELSE (the third report, and the one that
+		* explains the screenshots: "switching the icon while it is thinking desynchronises the
+		* colours"). Every animated element ran its OWN copy of the animation, so a re-created icon —
+		* any loader change rebuilds that span — started at phase 0 while the text, already seconds into
+		* its own copy, kept going: measured Δ of 216 and then 243 RGB units, i.e. the freshly built
+		* icon at the leading stop beside a violet text. ONE animation on the element that contains
+		* both (the wrapper `paintHost` writes to) cannot desynchronise: a node that joins later has no
+		* animation of its own to restart, it just reads the live `--tq-ink` its ancestors carry.
 		* @param bg - the app background the stops are fitted against.
 		* @param glow - the sweep brightness, 0-100 (the highlight stays a brighter version of the hue).
 		* @returns the CSS text.
@@ -2876,23 +2885,22 @@ window.__ModuleLoader__.load({
 				+ "100%{color:" + stops[0] + ";--tq-ink:" + stops[0] + "}";
 			const flow = "animation:tq-rainbow-ink " + speed + " linear infinite !important";
 			const share = Math.max(0, Math.min(100, 100 - (Number.isFinite(glow) ? glow : 0)));
+			void share; // the highlight is written by paintHost as an inline `var(--tq-ink)` mix
+			// The wrapper the plugin owns (`paintHost` writes the tokens there) plus the 0.1.x status
+			// element, which is that shell's equivalent. Both contain the icon AND the text.
+			const scope = "[data-tq-owned],[role=\"status\"][class*=\"turnStatus\"]";
 			return ""
 				+ "@property --tq-ink{syntax:\"<color>\";inherits:true;initial-value:" + stops[0] + "}"
-				+ ".tq-line,.tq-wave{--tq-ink:" + stops[0]
-				+ ";--dsw-alias-label-deep-diving:var(--tq-ink)"
-				+ ";--dsw-alias-label-shimmer:color-mix(in srgb, var(--tq-ink) " + share + "%, white)"
-				+ ";" + flow + "}"
-				+ ".tq-loader{" + flow + "}"
+				+ scope + "{--tq-ink:" + stops[0] + ";" + flow + "}"
 				// The shell's own base glyphs: `TextShimmer`'s `.text` carries an EXPLICIT colour
 				// rather than a token (measured: it stayed `rgb(43, 83, 199)` while the sweep followed
-				// the hue), so the token routing above cannot reach it. `data-shimmer-text` is the
+				// the hue), so the token routing alone cannot reach it. `data-shimmer-text` is the
 				// stable attribute the plugin already reads for the elapsed clock, and the visible
 				// glyphs are that element's `::after`, which inherits from it.
 				+ ".tq-line [data-shimmer-text]{color:var(--tq-ink) !important}"
-				+ "[role=\"status\"][class*=\"turnStatus\"]{" + flow + "}"
 				+ "@keyframes tq-rainbow-ink{" + ink + "}"
-				+ "@media (prefers-reduced-motion:reduce){.tq-line,.tq-wave,.tq-loader,[role=\"status\"][class*=\"turnStatus\"]"
-				+ "{animation:none !important;color:" + stops[0] + " !important}.tq-line [data-shimmer-text]{color:" + stops[0] + " !important}}";
+				+ "@media (prefers-reduced-motion:reduce){" + scope
+				+ "{animation:none !important;--tq-ink:" + stops[0] + " !important}.tq-line [data-shimmer-text]{color:" + stops[0] + " !important}}";
 		}
 		/**
 		* Apply the configured colour and sweep brightness.
@@ -2936,11 +2944,13 @@ window.__ModuleLoader__.load({
 					el.id = COLOR_STYLE_ID;
 					document.head.appendChild(el);
 				}
-				// No flat colour to write: the gradient paints the text and the icon has its own
-				// keyframes. The sweep token still answers the brightness control, keyed off the
-				// rainbow's leading colour so the two controls do not fight.
+				// The tokens are written as INLINE `var(--tq-ink)` references on the wrapper the
+				// animation runs on, so every descendant — the icon, the line, and DSH's own text and
+				// sweep — resolves the same live value. That is what keeps a re-created icon in phase
+				// (see rainbowCSS): it reads this instead of animating its own copy.
+				const share = Math.max(0, Math.min(100, 100 - glow));
 				el.textContent = rainbowCSS(bg, glow);
-				tintHost(null, sweep);
+				tintHost("var(--tq-ink)", "color-mix(in srgb, var(--tq-ink) " + share + "%, white)");
 				return;
 			}
 			const legacy = "[role=\"status\"][class*=\"turnStatus\"]{background-image:linear-gradient(90deg, " + base + " 0%, " + base + " 40%, " + sweep + " 50%, " + base + " 60%, " + base + " 100%) !important}";
