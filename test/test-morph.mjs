@@ -201,7 +201,7 @@ for (let i = 0; i < steps * ORDER.length; i++) {
 ok("no frame-to-frame jump (smooth morph)", worstStep < 0.4, `worst point move ${worstStep.toFixed(3)} units at cycle point ${worstAt.toFixed(2)}`);
 
 // Same idea over the REAL frames (rotation included), plus the number that actually
-// matters for a spinning icon: its angular rate. For reference the ring does 360° in
+// matters for a spinning icon: its angular rate. The morph's own spin is the reference,
 // 900ms ≈ 6.7°/frame at 60fps, so the morph must not be in a different league — a
 // quintic ease-in-out was tried first and hit 8.6°/frame, which reads as a snap.
 let worstReal = 0;
@@ -224,7 +224,7 @@ for (let ms = 0; ms + frameMs <= api.MORPH_CYCLE_MS; ms += frameMs) {
 	worstDegPerSecond = Math.max(worstDegPerSecond, deg * (1000 / frameMs));
 }
 ok("no jump between real 60fps frames (rotation included)", worstReal < 1.2, `worst point move ${worstReal.toFixed(3)} units at ${worstRealAt.toFixed(0)}ms`);
-ok("the turn never whips (at most ~8°/frame, the ring does 6.7°)", worstDegPerFrame < 8, `peak ${worstDegPerFrame.toFixed(2)}°/frame (${worstDegPerSecond.toFixed(0)}°/s) at ${worstDegAt.toFixed(0)}ms`);
+ok("the turn never whips (at most ~8°/frame)", worstDegPerFrame < 8, `peak ${worstDegPerFrame.toFixed(2)}°/frame (${worstDegPerSecond.toFixed(0)}°/s) at ${worstDegAt.toFixed(0)}ms`);
 
 const rots = [];
 for (let seg = 0; seg < ORDER.length; seg++) {

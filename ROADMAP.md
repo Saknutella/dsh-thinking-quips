@@ -67,7 +67,30 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.11.1 — A refresh no longer opens on the same quip (current)
+## 0.11.2 — Three fixes reported from real use (current)
+
+- [x] **The plugin's own spinner ring is gone** — it was the same gesture as DSH's official state dot,
+      which this plugin can render, so keeping both only made the dropdown longer. A saved choice of
+      `ring` migrates to `stateDot` in `loadConfig` (a silent fall-back to the default would have left
+      the dropdown and the line disagreeing), and the official option's own degradation path now falls
+      back to `orbit` instead of the removed style. The ring's CSS-borders lesson stays in the history
+      above; its painter, keyframes and rules are gone.
+- [x] **The sprites are framed on their own content** — the delivery draws inside a 24-unit box with
+      wide margins: the jelly block filled 42% of a 1em icon, the bead's track 56%, the bouncing ball
+      33%, which read as "small next to the text" (reported). Each sprite now carries a `frame`
+      (measured over one animation cycle in a browser) and draws through it, so every icon fills
+      **93%-97%** of its box and its motion scales with it. The geometry itself is untouched: the
+      delivery comparison still checks it against the SVG files field by field.
+- [x] **…and three of them did not animate at all** — the first port turned the delivery's
+      `translateY(4.6px)` into a unitless `4.6`, reasoning that a unitless length in an SVG transform
+      is a user unit. That is true of the `transform` ATTRIBUTE, not of CSS, where `translateY(4.6)`
+      is an invalid value and the whole declaration is dropped: bonk's mallet, the bead and the
+      bouncing ball had **0px of travel** (measured). The unit is back (in CSS on an SVG element `px`
+      *is* the local user unit, so it still scales with the box), and the browser acceptance now
+      asserts that every sprite **visibly animates** — a part that moves at least 6% of its box, or one
+      whose size changes by 15% — which is the check that would have caught it.
+
+## 0.11.1 — A refresh no longer opens on the same quip
 
 - [x] **The rotation's opening index is random per page load** — the quip index is derived from the
       clock (`floor(elapsed / quipMs) % count`) on purpose, so that a shell re-render cannot move the
@@ -238,7 +261,7 @@ the settings nav, and stop the running line's own re-renders from interrupting w
       node is not there, `native` falls back to reading the mask out of the official
       stylesheet's CSSOM (the rule is nested two levels deep, `@supports` → `@media`), and
       when neither is available it degrades like the other official options
-      (`stateDot → ring`, `fish`/`native` → `orbit`). DSH's whale is a **choice** rather than
+      (`stateDot` → the plugin's own spinner at the time — `orbit` since 0.11.2, `fish`/`native` → `orbit`). DSH's whale is a **choice** rather than
       a permanent neighbour: whenever the plugin draws an icon of its own, the wrapper is
       marked (`data-tq-icon`) and the stylesheet retires DSH's node by attribute — leaving
       the node itself untouched — so the line always shows exactly one indicator. Pick

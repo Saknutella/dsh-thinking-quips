@@ -181,7 +181,6 @@ const iValue = (cell) => cell.style.props["--i"];
 const ORBIT_ORDER = ["0", "1", "2", "7", null, "3", "6", "5", "4"];
 const CASES = [
 	{ loader: "orbit", size: "md", cls: "tq-loader-orbit", scale: "1", cells: 9, indices: ORBIT_ORDER },
-	{ loader: "ring", size: "md", cls: "tq-loader-ring", scale: "1", cells: 0, indices: [] },
 	{ loader: "pulse", size: "sm", cls: "tq-loader-pulse", scale: "0.8", cells: 1, indices: ["0"] },
 	{ loader: "dots", size: "lg", cls: "tq-loader-dots", scale: "1.25", cells: 3, indices: ["0", "1", "2"] },
 	{ loader: "bars", size: "lg", cls: "tq-loader-bars", scale: "1.25", cells: 3, indices: ["0", "1", "2"] },
@@ -192,7 +191,7 @@ for (const c of CASES) {
 	const span = applyWith(c.loader, c.size);
 	if (!span._classes.includes(c.cls)) throw new Error(`${c.loader}: expected class ${c.cls}, got "${span.className}"`);
 	if (span.getAttribute("data-style") !== c.loader) throw new Error(`${c.loader}: data-style=${span.getAttribute("data-style")}`);
-	// Only `<i>` cells count: the ring's `<svg>` is checked separately below.
+	// Only `<i>` cells count (the SVG-drawn styles are checked separately below).
 	const cells = span.children.filter((child) => child.tagName === "i");
 	if (cells.length !== c.cells) throw new Error(`${c.loader}: expected ${c.cells} cells, got ${cells.length}`);
 	c.indices.forEach((want, i) => {
@@ -235,7 +234,7 @@ console.log(`OK   style switch swaps in place (1 icon, ${swapped.children.length
 const cssEl = document.getElementById("dsh-thinking-quips-style");
 if (!cssEl) throw new Error("plugin CSS was not injected");
 const css = cssEl.textContent;
-const KEYFRAMES = { orbit: "tq-orbit-chase", ring: "tq-spin", pulse: "tq-pulse", dots: "tq-dots", bars: "tq-bars" };
+const KEYFRAMES = { orbit: "tq-orbit-chase", pulse: "tq-pulse", dots: "tq-dots", bars: "tq-bars" };
 for (const style of api.LOADER_STYLES) {
 	if (css.indexOf(`.tq-loader-${style}`) === -1) throw new Error(`CSS missing .tq-loader-${style}`);
 }
@@ -247,54 +246,31 @@ if (css.indexOf("prefers-reduced-motion") === -1) throw new Error("CSS does not 
 if (css.indexOf(".tq-loader{") === -1) throw new Error("CSS missing the shared .tq-loader base rule");
 console.log(`OK   CSS covers ${api.LOADER_STYLES.length} styles + keyframes + reduced motion (${css.length} bytes)`);
 
-// The ring must be REAL SVG geometry, not CSS borders: `border-radius:50%` with
-// per-side colours meets at mitred corners, which read as a rounded square at 16px
-// (shipped that way in 0.4.0-0.4.2), and a two-border arc alone reads as a "C".
+// Reads one CSS rule's body by selector ([^}]*, so a rule that contains nested braces needs
+// the raw sheet instead — see the reduced-motion checks).
 function rule(selector) {
 	const m = new RegExp(selector.replace(/[.*+?^${}()|[\]\\]/g, "\\$&") + "\\{([^}]*)\\}").exec(css);
 	if (!m) throw new Error(`CSS rule not found: ${selector}`);
 	return m[1];
 }
-const ringSpan = applyWith("ring", "md");
-const ringSvg = ringSpan.children[0];
-if (!ringSvg || ringSvg.tagName !== "svg") throw new Error("the ring does not build an <svg>");
-if (ringSpan.children.length !== 1) throw new Error(`the ring should hold exactly one svg, got ${ringSpan.children.length}`);
-if (ringSvg.getAttribute("viewBox") !== "0 0 16 16") throw new Error(`ring viewBox is ${ringSvg.getAttribute("viewBox")}`);
-const circles = ringSvg.children.filter((c) => c.tagName === "circle");
-if (circles.length !== 2) throw new Error(`the ring needs a track and an arc, got ${circles.length} circles`);
-// SVG className is not a string, so the plugin sets the class ATTRIBUTE — read it back the same way.
-const classes = circles.map((c) => c.getAttribute("class"));
-if (classes.join(",") !== "tq-ringTrack,tq-ringArc") throw new Error(`unexpected ring circles: ${classes.join(",")}`);
-for (const c of circles) {
-	if (c.getAttribute("r") !== "6.5" || c.getAttribute("cx") !== "8" || c.getAttribute("cy") !== "8") {
-		throw new Error(`ring circle is off-centre: ${JSON.stringify(c._attrs)}`);
-	}
-}
-console.log("OK   ring = <svg viewBox=0 0 16 16> with a centre-8 r-6.5 track + arc");
 
-const ringBox = rule(".tq-loader-ring");
-const ringSvgCss = rule(".tq-loader-ring svg");
-const ringTrack = rule(".tq-loader-ring .tq-ringTrack");
-const ringArc = rule(".tq-loader-ring .tq-ringArc");
-// 1em = the loader's own base (16px + --dsh-content-font-delta), so the box tracks the
-// user's content font size instead of freezing at 16px (see the block at the end).
-if (!/width:1em/.test(ringBox) || !/height:1em/.test(ringBox)) throw new Error(`ring box is not 1em square: ${ringBox}`);
-if (!/display:block/.test(ringBox)) throw new Error("ring box is not block-level (width/height would not apply if it stops being a flex item)");
-if (!/width:1em/.test(ringSvgCss) || !/height:1em/.test(ringSvgCss)) throw new Error(`ring svg is not 1em square: ${ringSvgCss}`);
-if (!/overflow:visible/.test(ringSvgCss)) throw new Error("ring svg would clip its own stroke");
-if (!/animation:tq-spin/.test(ringSvgCss)) throw new Error("ring svg does not spin");
-if (!/fill:none/.test(ringTrack) || !/stroke:currentColor/.test(ringTrack)) throw new Error(`ring track is not a stroked circle: ${ringTrack}`);
-if (!/stroke-width:2/.test(ringTrack)) throw new Error("ring track has the wrong stroke width");
-if (!/opacity:\.2/.test(ringTrack)) throw new Error("ring track is not faint");
-if (!/fill:none/.test(ringArc) || !/stroke:currentColor/.test(ringArc)) throw new Error(`ring arc is not a stroked circle: ${ringArc}`);
-if (!/stroke-linecap:round/.test(ringArc)) throw new Error("ring arc ends are not rounded");
-if (!/stroke-dasharray:[\d.]+ [\d.]+/.test(ringArc)) throw new Error(`ring arc is not a dash arc: ${ringArc}`);
-const reduced = rule("@media (prefers-reduced-motion:reduce)");
-for (const stopped of [".tq-loader i", ".tq-loader svg", ".tq-waveItem"]) {
-	if (reduced.indexOf(stopped) === -1) throw new Error(`reduced motion does not stop ${stopped}`);
+// 0.11.2 removed the plugin's own spinner ring: it was the same gesture as DSH's official state
+// dot, which the plugin can render, so the official one is the only spinner left.
+if (api.LOADER_STYLES.indexOf("ring") !== -1) throw new Error("ring is still a loader style");
+if (css.indexOf(".tq-loader-ring") !== -1 || css.indexOf("tq-ringTrack") !== -1) {
+	throw new Error("the ring's CSS survived its removal");
 }
-if (reduced.indexOf("animation:none!important") === -1) throw new Error("the reduced-motion block does not disable animations");
-console.log("OK   ring CSS = stroked track (20%) + round-capped dash arc + reduced-motion stop");
+if (css.indexOf("@keyframes tq-spin") !== -1) throw new Error("the ring's keyframes survived its removal");
+{
+	// A saved choice of the removed style must land on the official option rather than on the default,
+	// or the settings dropdown and the line would disagree about what is showing.
+	const kept = globalThis.localStorage.getItem;
+	globalThis.localStorage.getItem = () => JSON.stringify({ loader: "ring", loaderSize: "md" });
+	const saved = loaded.factory(requireStub).__internal.loadConfig();
+	globalThis.localStorage.getItem = kept;
+	if (saved.loader !== "stateDot") throw new Error(`a saved "ring" should migrate to stateDot, got ${saved.loader}`);
+}
+console.log("OK   the ring style is gone, and a saved choice of it migrates to the official state dot");
 
 // The morph: one SVG path (rewritten per frame by JS, so no CSS animation may
 // fight its transform attribute).
@@ -332,7 +308,7 @@ if (!/animation:tq-wave/.test(waveItemCss) || !/var\(--tq-speed/.test(waveItemCs
 if (!/animation-delay:calc\(var\(--i\)[^)]*var\(--tq-speed/.test(waveItemCss)) throw new Error(`the wave stagger is not scaled: ${waveItemCss}`);
 if (!/@keyframes tq-wave\{/.test(css)) throw new Error("the wave keyframes are missing");
 if (css.indexOf('[class*="turnStatus"].tq-waving{animation:none') === -1) throw new Error("nothing stops DSH's sweep while the wave owns the line");
-const scaledRules = [".tq-loader-orbit i", ".tq-loader-ring svg", ".tq-loader-pulse i", ".tq-loader-dots i", ".tq-loader-bars i", ".tq-waveItem"];
+const scaledRules = [".tq-loader-orbit i", ".tq-loader-pulse i", ".tq-loader-dots i", ".tq-loader-bars i", ".tq-waveItem"];
 for (const selector of scaledRules) {
 	const body = rule(selector);
 	if (!/var\(--tq-speed/.test(body)) throw new Error(`${selector} ignores the global speed: ${body}`);
@@ -470,10 +446,10 @@ const requestedOf = (span) => span.getAttribute("data-style");
 }
 {
 	const dot = applyWith("stateDot", "md", false, null, { withPrimitives: false });
-	if (effectiveOf(dot) !== "ring") throw new Error(`stateDot should degrade to the plugin spinner, got ${effectiveOf(dot)}`);
+	if (effectiveOf(dot) !== "orbit") throw new Error(`stateDot should degrade to the plugin's default now that the ring is gone, got ${effectiveOf(dot)}`);
 	if (requestedOf(dot) !== "stateDot") throw new Error("the degraded icon forgot what the user picked");
-	if (!dot.children.some((c) => c.tagName === "svg")) throw new Error("the fallback ring is not an svg");
-	console.log("OK   without the seed stateDot degrades to the plugin's own ring");
+	if (dot.children.some((c) => c.tagName === "svg")) throw new Error("the fallback should be the plugin's cell-drawn default, not an svg");
+	console.log("OK   without the seed stateDot degrades to the plugin's own default");
 }
 {
 	const fish = applyWith("fish", "md", false, null, { withPrimitives: false });
@@ -603,7 +579,7 @@ console.log("\n── the native icon's sizing and its speed cue ──");
 // excluded — they size themselves and must not inherit a font-size the plugin invented.
 console.log("\n── the icons follow the content font size ──");
 {
-	const base = ".tq-loader-orbit,.tq-loader-ring,.tq-loader-pulse,.tq-loader-dots,.tq-loader-bars,.tq-loader-morph,.tq-loader-fish,.tq-loader-sprites"
+	const base = ".tq-loader-orbit,.tq-loader-pulse,.tq-loader-dots,.tq-loader-bars,.tq-loader-morph,.tq-loader-fish,.tq-loader-sprites"
 		+ "{font-size:calc(16px + var(--dsh-content-font-delta,0px))}";
 	if (css.indexOf(base) === -1) {
 		throw new Error("the plugin's own icons do not follow --dsh-content-font-delta");
@@ -618,7 +594,6 @@ console.log("\n── the icons follow the content font size ──");
 	// the 16px base again the moment the user changes the setting.
 	const RELATIVE = [
 		".tq-loader-orbit", ".tq-loader-orbit i",
-		".tq-loader-ring", ".tq-loader-ring svg",
 		".tq-loader-morph", ".tq-loader-morph svg",
 		".tq-loader-fish", ".tq-loader-pulse i",
 		".tq-loader-dots", ".tq-loader-dots i",
@@ -716,11 +691,24 @@ console.log("\n── the contributed sprites ──");
 		return null;
 	};
 	for (const id of ids) {
+		const frame = SPRITES[id].frame;
+		if (frame === void 0) throw new Error(`${id} has no frame`);
 		const span = applyWith(id, "md");
 		const svg = span.children[0];
 		if (!svg || svg.tagName !== "svg") throw new Error(`${id} does not build an <svg>`);
-		if (svg.getAttribute("viewBox") !== `0 0 ${api.SPRITE_BOX} ${api.SPRITE_BOX}`) {
-			throw new Error(`${id} viewBox is ${svg.getAttribute("viewBox")}`);
+		// The `viewBox` is the sprite's own FRAME: a square, measured over one animation cycle in a
+		// browser, that contains everything the sprite draws. The delivery's 24-unit box leaves
+		// 17%-86% of a 1em icon empty, which read as "small next to the text" (reported), so each
+		// sprite is framed on its own content. The numbers are measured; the browser probe checks
+		// that nothing is clipped and nothing is tiny, and the delivery comparison below checks that
+		// the geometry itself is untouched.
+		if (!(frame.size >= 6) || frame.size > api.SPRITE_BOX) {
+			throw new Error(`${id} has an implausible frame size: ${frame.size}`);
+		}
+		const viewBox = svg.getAttribute("viewBox").split(/\s+/).map(Number);
+		if (viewBox.length !== 4 || viewBox[2] !== viewBox[3]
+			|| viewBox.join(" ") !== [frame.x, frame.y, frame.size, frame.size].join(" ")) {
+			throw new Error(`${id} draws through viewBox ${svg.getAttribute("viewBox")}, not its square frame`);
 		}
 		if (span.className.indexOf("tq-loader-sprites") === -1) throw new Error(`${id} is missing the sprite marker class`);
 		const nodes = walk(svg);
@@ -812,6 +800,21 @@ console.log("\n── the contributed sprites ──");
 	if (sparks[0].getAttribute("opacity") !== "0") throw new Error("bonk's sparks would stay visible in the still frame");
 	if ((sparks[0].children || []).length !== 2) throw new Error("the spark group should hold both lines");
 	console.log("OK   reduced motion freezes every sprite; the ripple keeps its pair, bonk's sparks vanish");
+
+	// 3b. A CSS `transform` length must carry a unit. A unitless length IS a user unit in the SVG
+	// `transform` ATTRIBUTE, but in CSS `translateY(4.6)` is an invalid value and the whole
+	// declaration is dropped — which is how bonk's mallet, the bead and the bouncing ball ended up
+	// with no animation at all while every other assertion stayed green. `translateY(0)` is fine:
+	// zero needs no unit.
+	const spriteCss = css.slice(css.indexOf(".tq-loader-jelly,"), css.indexOf("@media (prefers-reduced-motion:reduce)"));
+	const unitless = [...spriteCss.matchAll(/(?:translate|translateX|translateY)\(\s*(-?[0-9]*\.?[0-9]+)([a-z%]*)/g)]
+		.filter((m) => m[2] === "" && Number(m[1]) !== 0)
+		.map((m) => `${m[0]})`);
+	if (unitless.length > 0) throw new Error(`a sprite transform length has no unit: ${unitless.join(", ")}`);
+	for (const needed of ["translateY(2px)", "translateY(.4px)", "translateX(10.4px)", "translateY(4.6px)", "translateY(1.6px)"]) {
+		if (spriteCss.indexOf(needed) === -1) throw new Error(`the sprite CSS lost ${needed}`);
+	}
+	console.log("OK   every sprite transform length carries a unit (CSS drops unitless ones)");
 
 	// 4. The delivered SVGs are the SPEC OF RECORD, so the table is compared against those FILES
 	// rather than against a transcription of them. Everything above checks an invariant (no px,

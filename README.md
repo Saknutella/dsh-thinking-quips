@@ -2,11 +2,11 @@
 
 [English](README.md) · [中文](README.zh.md)
 
-`v0.11.1` · a **DSH bundle** (install-and-go) · web client plugin
+`v0.11.2` · a **DSH bundle** (install-and-go) · web client plugin
 
 **Lightweight personalisation for the DeepSeek Harness status line** — the line the
 conversation shows while the agent is working (DSH's default `Deep diving...`).
-Rotating bilingual quips, seventeen loading icons in three sizes, one-click colour presets,
+Rotating bilingual quips, sixteen loading icons in three sizes, one-click colour presets,
 theme-colour matching that reaches 4.5:1, and an optional elapsed-time readout, all in
 **Settings → Playful quips** (its own page in the settings nav, not a row under General).
 
@@ -14,16 +14,16 @@ Incremental by design: no dependencies, no build step, no config file, no networ
 requests. One hand-written client file, settings in `localStorage`, and stock DSH
 packages are **not** modified.
 
-![Seventeen loading icons across three sizes beside a live status line rotating through the shipped quips](assets/preview-gallery.png)
+![Sixteen loading icons across three sizes beside a live status line rotating through the shipped quips](assets/preview-gallery.png)
 
 ## Features
 
-- **Seventeen loading icons** — dot orbit (default), spinner ring, shape morph, pulse,
-  bouncing dots, equalizer bars, **eight drawn sprites** from two contributed design families
+- **Sixteen loading icons** — dot orbit (default), shape morph, pulse, bouncing dots,
+  equalizer bars, **eight drawn sprites** from two contributed design families
   (a jelly block that squashes, a metronome arm, a mallet with sparks, a pinwheel, two rings
   rippling outwards, a bead running its track, a pair of sparkle stars and a bouncing ball with
-  its own shadow), plus three that reuse what DSH already ships: its `StateDot` spinner, its logo
-  mark, and **DSH's own running whale** (cloned out of the live line, animation included) — each
+  its own shadow), plus three that reuse what DSH already ships: the official `StateDot` spinner (the plugin's own ring went in 0.11.2 —
+  the two were the same gesture), its logo mark, and **DSH's own running whale** (cloned out of the live line, animation included) — each
   in **S / M / L**.
   DSH's whale is one of the choices rather than a permanent neighbour, so the line always
   shows exactly one indicator; pick **Official whale** to have it back.
