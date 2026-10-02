@@ -371,7 +371,14 @@ window.__ModuleLoader__.load({
 		* the live line. Each of them degrades to a plugin-drawn icon when its source is
 		* missing (see {@link resolveLoader}), because an older shell may have neither.
 		*/
-		const LOADER_STYLES = ["orbit", "ring", "pulse", "dots", "bars", "morph", "stateDot", "fish", "native"];
+		const LOADER_STYLES = [
+			"orbit", "ring", "pulse", "dots", "bars", "morph", "stateDot", "fish",
+			// Contributed sprites (see {@link LOADER_SPRITES}): the two design families the
+			// plugin's own icons are joined by. They sit before the official options so the
+			// drawn-by-us group stays together and the two DSH-derived entries stay at the end.
+			"jelly", "tickTock", "bonk", "pinwheel", "ripple", "beadRun", "sparkleSwap", "bounceBall",
+			"native"
+		];
 		/** The subset that needs `@deepseek-ai/dsh-client-ui-primitives` to render. */
 		const OFFICIAL_LOADERS = ["stateDot", "fish"];
 		/** Visual scale per size token (applied as a CSS variable on the loader). */
@@ -381,6 +388,12 @@ window.__ModuleLoader__.load({
 		/** Ring geometry in SVG user units inside a {@link RING_BOX} square. */
 		const RING_BOX = 16;
 		const RING_RADIUS = 6.5;
+		/**
+		* The `viewBox` the contributed sprites are drawn in — the size their geometry was
+		* delivered at, so every coordinate in {@link LOADER_SPRITES} is the delivered number
+		* (CSS sizes the `<svg>` to `1em`; nothing here is ever a pixel value).
+		*/
+		const SPRITE_BOX = 24;
 		/** ~30% of the 2*pi*RING_RADIUS circumference is drawn, the rest is the gap. */
 		const RING_DASH = "12.3 28.6";
 
@@ -2220,6 +2233,191 @@ window.__ModuleLoader__.load({
 			span.appendChild(svg);
 		}
 		/**
+		* The contributed sprite icons: geometry only, drawn by {@link ensureSprite}.
+		*
+		* WHY A TABLE INSTEAD OF A FUNCTION PER ICON: eight icons of two design families, all built
+		* from the same three or four primitives, so a table keeps every coordinate reviewable in one
+		* place — and it is what makes the "no px in the geometry" self-check possible (a rule that
+		* walks this table instead of a human reading eight functions).
+		*
+		* The values are the delivered `viewBox` units, unrounded. `paint` is sugar for the two
+		* things every part does: `"fill"` = `fill="currentColor"`, `"stroke"` = `stroke="currentColor"`
+		* plus `fill="none"`; a part may instead carry explicit paint attributes in `attrs` (that is
+		* how the stroked groups set one `stroke-width` for several children).
+		*
+		* Every part that carries a class also carries the `tq-sprite` marker, and the stylesheet only
+		* ever animates classed parts — so ONE reduced-motion rule can freeze whatever is animated,
+		* including sprites added later. (Static parts carry the marker too; the class is what decides,
+		* and the self-check asserts that every class the stylesheet animates is in the markup.)
+		*
+		* Anchors: each animated part is wrapped in a `<g transform="translate(…)">` and rotates or
+		* squashes about `transform-origin:0 0`, i.e. about the point that group puts at the origin
+		* (an axis, a bottom centre, a box centre). That is the delivered convention, and it is also
+		* what the stylesheet's per-icon rules assume.
+		*
+		* Transient parts (bonk's sparks) ship with a static `opacity="0"`: CSS animations outrank the
+		* attribute while they run, so the part shows only during its keyframes, and a stopped
+		* animation leaves it invisible — which is exactly what the design's still frame asks for.
+		*/
+		const LOADER_SPRITES = {
+			// Busy Bits 02 — a block that squashes onto the ground and springs back.
+			jelly: {
+				parts: [{
+					tag: "g",
+					attrs: { transform: "translate(12 16.8)" },
+					parts: [{ tag: "rect", cls: "tq-jelly-body", paint: "fill", attrs: { x: -4.7, y: -9.4, width: 9.4, height: 9.4, rx: 2.7 } }]
+				}]
+			},
+			// Busy Bits 03 — a metronome arm swinging between two walls.
+			tickTock: {
+				parts: [{
+					tag: "g",
+					attrs: { transform: "translate(12 13.6)", "stroke-width": 2.4, "stroke-linecap": "round" },
+					parts: [
+						{ tag: "path", cls: "tq-tick-case", paint: "stroke", attrs: { d: "M-5.6 6.6 L-2.2 -0.8 M5.6 6.6 L2.2 -0.8 M-6.2 6.6 H6.2" } },
+						{ tag: "line", cls: "tq-tick-arm", paint: "stroke", attrs: { x1: 0, y1: 1, x2: 0, y2: -7.4 } },
+						{ tag: "circle", cls: "tq-tick-pivot", paint: "fill", attrs: { r: 1.9 } }
+					]
+				}]
+			},
+			// Busy Bits 05 — a mallet taps an 8×8 block; the sparks are transient.
+			bonk: {
+				parts: [
+					{
+						tag: "g",
+						attrs: { transform: "translate(12.85 4.75) rotate(45)", "stroke-width": 2.4, "stroke-linecap": "round" },
+						parts: [{ tag: "line", cls: "tq-bonk-stick", paint: "stroke", attrs: { x1: 0, y1: -6.6, x2: 0, y2: 1.2 } }]
+					},
+					{
+						tag: "g",
+						attrs: { transform: "translate(12 15.2)" },
+						parts: [{ tag: "rect", cls: "tq-bonk-block", paint: "fill", attrs: { x: -4, y: -8, width: 8, height: 8, rx: 2.2 } }]
+					},
+					{
+						// The sparks are ONE animated group in the delivery (the class sits on the `<g>`,
+						// not on the two lines) and their `opacity="0"` is there as well — so a stopped
+						// animation leaves the whole pair invisible, which is the still frame.
+						tag: "g",
+						cls: "tq-bonk-spark",
+						attrs: { "stroke-width": 2.4, "stroke-linecap": "round", stroke: "currentColor", opacity: 0 },
+						parts: [
+							{ tag: "line", attrs: { x1: 8.6, y1: 5.4, x2: 6.6, y2: 3.4 } },
+							{ tag: "line", attrs: { x1: 15.4, y1: 5.4, x2: 17.4, y2: 3.4 } }
+						]
+					}
+				]
+			},
+			// Busy Bits 06 — a three-blade pinwheel turning about the box centre.
+			pinwheel: {
+				parts: [{
+					tag: "g",
+					attrs: { transform: "translate(12 12)" },
+					parts: [{
+						tag: "g",
+						cls: "tq-pinwheel-rot",
+						attrs: { fill: "currentColor" },
+						parts: [
+							{ tag: "ellipse", attrs: { cx: 0, cy: -5.8, rx: 2.8, ry: 4.2 } },
+							{ tag: "ellipse", attrs: { cx: 0, cy: -5.8, rx: 2.8, ry: 4.2, transform: "rotate(120)" } },
+							{ tag: "ellipse", attrs: { cx: 0, cy: -5.8, rx: 2.8, ry: 4.2, transform: "rotate(240)" } },
+							{ tag: "circle", attrs: { r: 1.9 } }
+						]
+					}]
+				}]
+			},
+			// Busy Bits 07 — two rings pulsing outwards half a cycle apart.
+			ripple: {
+				parts: [{
+					tag: "g",
+					attrs: { transform: "translate(12 12)", "stroke-width": 2.4, fill: "none", stroke: "currentColor" },
+					parts: [
+						{ tag: "circle", cls: "tq-ripple-wave1", attrs: { r: 9.6 } },
+						{ tag: "circle", cls: "tq-ripple-wave2", attrs: { r: 9.6 } }
+					]
+				}]
+			},
+			// Busy Bits 08 — a bead running the track and reappearing at the start.
+			beadRun: {
+				parts: [{
+					tag: "g",
+					attrs: { transform: "translate(12 12)" },
+					parts: [
+						{ tag: "line", paint: "stroke", attrs: { x1: -5.2, y1: 0, x2: 5.2, y2: 0, "stroke-width": 2.4, "stroke-linecap": "round" } },
+						{ tag: "circle", cls: "tq-bead-run", paint: "fill", attrs: { cx: -5.2, r: 2 } }
+					]
+				}]
+			},
+			// Bouncy Pals 02 — two four-point stars blooming in turn (one keyframe set, half a
+			// cycle of delay between them; the delivered files spell the same thing out twice).
+			sparkleSwap: {
+				parts: [
+					{
+						tag: "g",
+						attrs: { transform: "translate(8.2 8.4)" },
+						parts: [{ tag: "path", cls: "tq-sparkle-big", paint: "fill", attrs: { d: "M0 -4.6 Q1.1 -1.1 4.6 0 Q1.1 1.1 0 4.6 Q-1.1 1.1 -4.6 0 Q-1.1 -1.1 0 -4.6 Z" } }]
+					},
+					{
+						tag: "g",
+						attrs: { transform: "translate(15.8 15.6) scale(.62)" },
+						parts: [{ tag: "path", cls: "tq-sparkle-small", paint: "fill", attrs: { d: "M0 -4.6 Q1.1 -1.1 4.6 0 Q1.1 1.1 0 4.6 Q-1.1 1.1 -4.6 0 Q-1.1 -1.1 0 -4.6 Z" } }]
+					}
+				]
+			},
+			// Bouncy Pals 03 — a ball bouncing on its own soft shadow. Drawn in the delivered order
+			// (shadow first): the two never overlap, but the port has no reason to differ.
+			bounceBall: {
+				parts: [
+					{
+						tag: "g",
+						attrs: { transform: "translate(12 18.8)" },
+						parts: [{ tag: "ellipse", cls: "tq-bounce-shadow", paint: "fill", attrs: { rx: 2.7, ry: 1.05, transform: "scale(.68)" } }]
+					},
+					{
+						tag: "g",
+						attrs: { transform: "translate(12 11.4)" },
+						parts: [{ tag: "circle", cls: "tq-bounce-ball", paint: "fill", attrs: { cy: -3.4, r: 3.4 } }]
+					}
+				]
+			}
+		};
+		/**
+		* Draw one {@link LOADER_SPRITES} icon into the loader span.
+		*
+		* The box is the delivered 24×24 `viewBox`; CSS sizes the `<svg>` to `1em`, so the geometry
+		* scales with the content font size (see `.tq-loader-sprites svg`) exactly like the plugin's
+		* own em-based icons — no width or height is ever written into the markup.
+		* @param span - the `.tq-loader` element to fill.
+		* @param spec - one entry of {@link LOADER_SPRITES}.
+		*/
+		function ensureSprite(span, spec) {
+			if (typeof document.createElementNS !== "function" || spec === void 0) return;
+			const svg = document.createElementNS(SVG_NS, "svg");
+			svg.setAttribute("viewBox", "0 0 " + SPRITE_BOX + " " + SPRITE_BOX);
+			svg.setAttribute("aria-hidden", "true");
+			svg.setAttribute("focusable", "false");
+			const paint = (node, part) => {
+				if (part.paint === "fill") node.setAttribute("fill", "currentColor");
+				else if (part.paint === "stroke") {
+					node.setAttribute("fill", "none");
+					node.setAttribute("stroke", "currentColor");
+				}
+				const attrs = part.attrs || {};
+				for (const key of Object.keys(attrs)) node.setAttribute(key, String(attrs[key]));
+				return node;
+			};
+			const build = (parts, parent) => {
+				for (const part of parts) {
+					const node = document.createElementNS(SVG_NS, part.tag);
+					if (part.cls !== void 0) node.setAttribute("class", part.cls + " tq-sprite");
+					paint(node, part);
+					build(part.parts || [], node);
+					parent.appendChild(node);
+				}
+			};
+			build(spec.parts, svg);
+			span.appendChild(svg);
+		}
+		/**
 		* DSH's own running-line whale, found by its CSS-module **local name** and never by
 		* the build-generated hash (`EvIC1a_…` changes on any rebuild; `runningIcon` does
 		* not). The wrapper we inject into is searched, so the plugin's own copy — which
@@ -2492,7 +2690,10 @@ window.__ModuleLoader__.load({
 					unmountLoaderIcon(); // the span the official dot was rooted in is gone
 				}
 				const span = document.createElement("span");
-				span.className = "tq-loader tq-loader-" + want;
+				// Contributed sprites carry one extra marker class, so the shared box rules and the
+				// reduced-motion freeze are written ONCE against `.tq-loader-sprites` / `.tq-sprite`
+				// instead of once per icon (and a sprite added later inherits both).
+				span.className = "tq-loader tq-loader-" + want + (LOADER_SPRITES[want] === void 0 ? "" : " tq-loader-sprites");
 				span.setAttribute("data-style", requested);
 				span.setAttribute("data-effective", want);
 				span.setAttribute("data-scale", scale);
@@ -2505,6 +2706,8 @@ window.__ModuleLoader__.load({
 					ensureStateDot(span);
 				} else if (want === "fish") {
 					ensureFish(span);
+				} else if (LOADER_SPRITES[want] !== void 0) {
+					ensureSprite(span, LOADER_SPRITES[want]);
 				} else if (want === "native") {
 					ensureNative(span, nativeSource);
 				} else {
@@ -3012,7 +3215,7 @@ window.__ModuleLoader__.load({
 			// Scoped to the plugin's OWN styles deliberately: -stateDot and -native mount DSH's own
 			// nodes, which size themselves (the native box already uses `14px + delta`) and must not
 			// inherit a font-size the plugin invented for its own drawings.
-			".tq-loader-orbit,.tq-loader-ring,.tq-loader-pulse,.tq-loader-dots,.tq-loader-bars,.tq-loader-morph,.tq-loader-fish{font-size:calc(16px + var(--dsh-content-font-delta,0px))}",
+			".tq-loader-orbit,.tq-loader-ring,.tq-loader-pulse,.tq-loader-dots,.tq-loader-bars,.tq-loader-morph,.tq-loader-fish,.tq-loader-sprites{font-size:calc(16px + var(--dsh-content-font-delta,0px))}",
 			// orbit: 3x3, the 8 outer dots chase clockwise, center empty.
 			".tq-loader-orbit{display:grid;grid-template-columns:repeat(3,.25em);grid-template-rows:repeat(3,.25em);gap:.125em;place-items:center}",
 			".tq-loader-orbit i{width:.1875em;height:.1875em;border-radius:50%;background:currentColor;opacity:.15;animation:tq-orbit-chase calc(1.6s / var(--tq-speed,1)) linear infinite;animation-delay:calc(var(--i) * .2s / var(--tq-speed,1))}",
@@ -3115,7 +3318,54 @@ window.__ModuleLoader__.load({
 			".tq-clock{color:var(--dsw-alias-label-tertiary);margin-left:6px;font-variant-numeric:tabular-nums}",
 			// The official TextShimmer is a React component; the plugin only gives it a box.
 			".tq-official{display:inline-flex;min-width:0}",
-			"@media (prefers-reduced-motion:reduce){.tq-loader i,.tq-loader svg,.tq-waveItem{animation:none!important}.tq-loader-stateDot svg *{animation:none!important}.tq-loader-native [class*=\"runningIcon\"]{animation:none!important}.tq-loader-orbit i,.tq-loader-dots i,.tq-loader-pulse i,.tq-loader-bars i{opacity:.7}.tq-loader-bars i{transform:scaleY(.7)}.tq-loader-orbit i.blank{opacity:0}}"
+			// ── contributed sprites (the two delivered design families) ──────────
+			// One box per sprite, `1em` like the plugin's own drawings, so the geometry in
+			// LOADER_SPRITES scales with the content font size and nothing here names a pixel.
+			// `--tq-loader-scale` still supplies the sm/md/lg ladder through the shared transform.
+			".tq-loader-jelly,.tq-loader-tickTock,.tq-loader-bonk,.tq-loader-pinwheel,.tq-loader-ripple,.tq-loader-beadRun,.tq-loader-sparkleSwap,.tq-loader-bounceBall{display:block;width:1em;height:1em}",
+			".tq-loader-sprites svg{display:block;width:1em;height:1em;overflow:visible}",
+			// Every animated part below is anchored by the `<g transform="translate(…)">` around it
+			// and rotates/squashes about `transform-origin:0 0` — i.e. about the point that translate
+			// puts at the origin (a pivot, a bottom centre, a box centre). The delivered files used
+			// that convention for most icons; tickTock's missing anchor is added here, because without
+			// it the arm rotates about its own box centre instead of the axis.
+			//
+			// Every duration is `calc(1.6s / var(--tq-speed,1))`, the family's shared rhythm: the
+			// multi-part icons (bonk, ripple, sparkleSwap, bounceBall) each carry the SAME expression
+			// per part, so the speed level cannot drift them out of phase with each other.
+			//
+			// Translation values are UNITLESS on purpose: inside an SVG a unitless length in a
+			// transform is a user unit (a viewBox unit), while the delivered `4.6px` / `10.4px`
+			// would have been device pixels, i.e. geometry that does not scale with the box.
+			".tq-jelly-body{transform-origin:0 0;animation:tq-jelly-squash calc(1.6s / var(--tq-speed,1)) cubic-bezier(.45,0,.55,1) infinite}",
+			"@keyframes tq-jelly-squash{0%,54%,100%{transform:scale(1,1)}28%{transform:scale(1.08,.84)}42%{transform:scale(.95,1.05)}76%{transform:scale(1.02,.98)}}",
+			".tq-tick-arm{transform-origin:0 0;animation:tq-tick-swing calc(1.6s / var(--tq-speed,1)) cubic-bezier(.45,0,.55,1) infinite}",
+			"@keyframes tq-tick-swing{0%,100%{transform:rotate(-42deg)}50%{transform:rotate(42deg)}}",
+			".tq-bonk-stick{animation:tq-bonk-strike calc(1.6s / var(--tq-speed,1)) cubic-bezier(.45,0,.55,1) infinite}",
+			"@keyframes tq-bonk-strike{0%,30%,100%{transform:translateY(0)}10%{transform:translateY(2)}20%{transform:translateY(.4)}}",
+			".tq-bonk-block{transform-origin:0 0;animation:tq-bonk-squash calc(1.6s / var(--tq-speed,1)) cubic-bezier(.45,0,.55,1) infinite}",
+			"@keyframes tq-bonk-squash{0%,10%,36%,72%,100%{transform:scale(1,1)}16%{transform:scale(1.12,.84)}26%{transform:scale(.96,1.05)}84%{transform:scale(1.01,.99)}}",
+			// The sparks ship with a static `opacity="0"`, so a stopped animation (reduced motion)
+			// leaves them invisible — the design's still frame is "cocked, not struck".
+			".tq-bonk-spark{animation:tq-bonk-spark calc(1.6s / var(--tq-speed,1)) linear infinite}",
+			"@keyframes tq-bonk-spark{0%,9%{opacity:0}12%,20%{opacity:1}23%,100%{opacity:0}}",
+			".tq-pinwheel-rot{transform-origin:0 0;animation:tq-pinwheel-spin calc(1.6s / var(--tq-speed,1)) linear infinite}",
+			"@keyframes tq-pinwheel-spin{0%{transform:rotate(0)}100%{transform:rotate(360deg)}}",
+			".tq-ripple-wave1,.tq-ripple-wave2{transform-origin:0 0;animation:tq-ripple-wave calc(1.6s / var(--tq-speed,1)) linear infinite}",
+			".tq-ripple-wave2{animation-delay:calc(-.8s / var(--tq-speed,1))}",
+			"@keyframes tq-ripple-wave{0%{transform:scale(.32);opacity:1}100%{transform:scale(1);opacity:0}}",
+			".tq-bead-run{animation:tq-bead-run calc(1.6s / var(--tq-speed,1)) linear infinite}",
+			"@keyframes tq-bead-run{0%{transform:translateX(0);opacity:1}78%{transform:translateX(10.4);opacity:1}84%{transform:translateX(10.4);opacity:0}85%{transform:translateX(0);opacity:0}92%,100%{transform:translateX(0);opacity:1}}",
+			// ONE bloom keyframe set: the small star is the same animation delayed half a cycle,
+			// which is exactly what the delivered pair of keyframe blocks spelled out separately.
+			".tq-sparkle-big,.tq-sparkle-small{transform-origin:0 0;animation:tq-sparkle-bloom calc(1.6s / var(--tq-speed,1)) linear infinite}",
+			".tq-sparkle-small{animation-delay:calc(-.8s / var(--tq-speed,1))}",
+			"@keyframes tq-sparkle-bloom{0%{opacity:0;transform:scale(.45)}22%{opacity:1;transform:scale(1)}44%,100%{opacity:0;transform:scale(.45)}}",
+			".tq-bounce-ball{transform-origin:0 0;animation:tq-bounce-jump calc(1.6s / var(--tq-speed,1)) ease infinite}",
+			"@keyframes tq-bounce-jump{0%{transform:translateY(0) scale(1,1)}34%{transform:translateY(4.6) scale(1,1);animation-timing-function:ease-in}42%{transform:translateY(4.6) scale(1.2,.76);animation-timing-function:ease-out}60%{transform:translateY(1.6) scale(.9,1.1)}82%,100%{transform:translateY(0) scale(1,1)}}",
+			".tq-bounce-shadow{transform-origin:0 0;animation:tq-bounce-shadow calc(1.6s / var(--tq-speed,1)) linear infinite}",
+			"@keyframes tq-bounce-shadow{0%,100%{transform:scaleX(.68)}42%{transform:scaleX(1)}}",
+			"@media (prefers-reduced-motion:reduce){.tq-loader i,.tq-loader svg,.tq-waveItem{animation:none!important}.tq-loader-stateDot svg *{animation:none!important}.tq-loader-native [class*=\"runningIcon\"]{animation:none!important}.tq-loader-sprites .tq-sprite{animation:none!important}.tq-loader-orbit i,.tq-loader-dots i,.tq-loader-pulse i,.tq-loader-bars i{opacity:.7}.tq-loader-bars i{transform:scaleY(.7)}.tq-loader-orbit i.blank{opacity:0}.tq-ripple-wave2{transform:scale(.32)}}"
 		].join("");
 
 		function injectPluginCss() {
@@ -3191,6 +3441,16 @@ window.__ModuleLoader__.load({
 			"quips.loader.morph": "形变环游",
 			"quips.loader.stateDot": "官方状态点（旋转）",
 			"quips.loader.fish": "官方鲸鱼标志（静态）",
+			// The contributed sprites: the design's own name first, then what it does, so the
+			// dropdown still reads like the motion-describing labels above it.
+			"quips.loader.jelly": "果冻块（压扁回弹）",
+			"quips.loader.tickTock": "节拍仔（左右摆动）",
+			"quips.loader.bonk": "敲敲仔（敲打方块）",
+			"quips.loader.pinwheel": "小风车（旋转）",
+			"quips.loader.ripple": "电波仔（一圈圈扩散）",
+			"quips.loader.beadRun": "进度珠（轨道往返）",
+			"quips.loader.sparkleSwap": "星光眨眨（双星交替）",
+			"quips.loader.bounceBall": "弹弹球（弹跳）",
 			"quips.loader.native": "官方鲸鱼（动态）",
 			"quips.loader.nativeNote": "官方鲸鱼的动画是图片自带的 60 帧 APNG，帧率写在图片里、CSS 改不了；速度档位会另加一个同步快慢的划水动作（「正常」不加任何东西）。",
 			"quips.sizeLabel": "图标尺寸",
@@ -3266,6 +3526,15 @@ window.__ModuleLoader__.load({
 			"quips.loader.morph": "Shape morph",
 			"quips.loader.stateDot": "Official state dot (spinning)",
 			"quips.loader.fish": "Official whale mark (still)",
+			// See the zh dictionary: name first, motion in brackets, matching the labels above.
+			"quips.loader.jelly": "Jelly block (squash & stretch)",
+			"quips.loader.tickTock": "Tick-Tock (swings)",
+			"quips.loader.bonk": "Bonk (hammer & sparks)",
+			"quips.loader.pinwheel": "Pinwheel (spins)",
+			"quips.loader.ripple": "Ripple (rings outwards)",
+			"quips.loader.beadRun": "Bead-Run (along the track)",
+			"quips.loader.sparkleSwap": "Sparkle-Swap (two stars)",
+			"quips.loader.bounceBall": "Bounce-Ball (bounces)",
 			"quips.loader.native": "Official whale (animated)",
 			"quips.loader.nativeNote": "DSH's whale is a 60-frame APNG, so its frame rate lives inside the image and no CSS can retime it; a speed level adds the plugin's own swim cue around it (Normal adds nothing).",
 			"quips.sizeLabel": "Icon size",
@@ -3969,6 +4238,9 @@ exports.__internal = {
 			mixToWhite,
 			DEFAULTS,
 			LOADER_STYLES,
+			LOADER_SPRITES,
+			SPRITE_BOX,
+			ensureSprite,
 			LOADER_SCALES,
 			TEXT_EFFECTS,
 			CLOCK_MODES,

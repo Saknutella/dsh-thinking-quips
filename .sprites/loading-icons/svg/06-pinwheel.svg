@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-pinwheel / 小风车</title>
+  <style>
+    .bb-pw-rot { animation: bb-pw-rot 1.6s linear infinite; }
+    @keyframes bb-pw-rot { to { transform: rotate(360deg); } }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-pw-rot { animation: none; }
+    }
+  </style>
+  <!-- 锚点=盒中心；叶椭圆 5.6x8.4(0.23h x 0.35h)，三叶120deg均布，外缘10(0.42h)；芯 r=1.9 -->
+  <g transform="translate(12 12)">
+    <g class="bb-pw-rot" fill="currentColor">
+      <ellipse cx="0" cy="-5.8" rx="2.8" ry="4.2"/>
+      <ellipse cx="0" cy="-5.8" rx="2.8" ry="4.2" transform="rotate(120)"/>
+      <ellipse cx="0" cy="-5.8" rx="2.8" ry="4.2" transform="rotate(240)"/>
+      <circle r="1.9"/>
+    </g>
+  </g>
+</svg>

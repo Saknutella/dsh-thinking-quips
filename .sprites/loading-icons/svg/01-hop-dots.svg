@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-hop-dots / 跳跳豆</title>
+  <style>
+    .bb-hd-dot { animation: bb-hd-hop 1.6s cubic-bezier(.45,0,.55,1) infinite; }
+    .bb-hd-d2 { animation-delay: -.27s; }
+    .bb-hd-d3 { animation-delay: -.53s; }
+    @keyframes bb-hd-hop {
+      0%, 36%, 100% { transform: translateY(0); }
+      18%           { transform: translateY(-3.6px); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-hd-dot { animation: none; }
+    }
+  </style>
+  <!-- 锚点=盒中心略下；豆 r=1.7(直径0.14h)，间距7.2(0.3h)，缝3.8(0.16h)；跳高3.6(0.15h) -->
+  <g transform="translate(12 13.4)" fill="currentColor">
+    <circle class="bb-hd-dot" cx="-7.2" r="1.7"/>
+    <circle class="bb-hd-dot bb-hd-d2" r="1.7"/>
+    <circle class="bb-hd-dot bb-hd-d3" cx="7.2" r="1.7"/>
+  </g>
+</svg>

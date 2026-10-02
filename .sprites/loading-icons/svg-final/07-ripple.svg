@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-ripple / 电波仔</title>
+  <style>
+    .bb-rp-w1, .bb-rp-w2 {
+      animation: bb-rp-wave 1.6s linear infinite;
+      transform-origin: 0 0; /* 锚点=盒中心 */
+    }
+    .bb-rp-w2 { animation-delay: -.8s; }
+    @keyframes bb-rp-wave {
+      0%   { transform: scale(.32); opacity: 1; }
+      100% { transform: scale(1);   opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-rp-w1, .bb-rp-w2 { animation: none; }
+    }
+  </style>
+  <!-- 两圈 r=9.6(0.4h) 从0.32倍长到1倍并渐隐，相位差半周期；线宽2.4恒定随缩放 -->
+  <g transform="translate(12 12)" fill="none" stroke="currentColor" stroke-width="2.4">
+    <circle class="bb-rp-w1" r="9.6"/>
+    <circle class="bb-rp-w2" r="9.6"/>
+  </g>
+</svg>

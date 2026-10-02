@@ -67,7 +67,44 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.10.0 — A rainbow that still keeps the contrast promise (current)
+## 0.11.0 — Eight contributed sprites (current)
+
+The design brief (`docs/loading图标设计需求.md` — in the repo, not in the published tarball) asks for 6–10 small
+animated icons bound to the font size, and the eight delivered files in `.sprites/loading-icons/svg-final/`
+arrived as static SVG carrying their own `<style>` blocks. This release adapts them into the plugin's
+loader system rather than shipping them as they are.
+
+- [x] **Geometry in a table, drawing in one function** — `LOADER_SPRITES` holds the delivered
+      viewBox coordinates unrounded (a 24-unit box) and `ensureSprite` walks it. The stylesheet sizes
+      the `<svg>` to `1em`, so the sprites scale with the content font size exactly like the plugin's
+      own em-based drawings, and nothing writes a pixel size: the delivery's `translateY(4.6px)` /
+      `translateX(10.4px)` became unitless user units (inside an SVG a unitless transform length IS a
+      viewBox unit, while `px` there is a device pixel). The self-check walks the whole table to prove
+      no value contains `px`.
+- [x] **Their animations moved into the plugin stylesheet** — the delivered `<style>`/`<title>` are not
+      ported; the keyframes live with the other loader rules, every duration is
+      `calc(1.6s / var(--tq-speed,1))` (the families' shared rhythm, so the speed control scales them
+      and a multi-part icon stays in phase with itself), and the two files that were missing a
+      `transform-origin` gain it: tickTock's arm would have rotated about its own box centre instead
+      of the axis, and pinwheel's blades about a point below the hub (an independent verification
+      sampled the three blades and measured that bounding-box centre at (0, −1.946)).
+- [x] **Reduced motion freezes each sprite on a frame that reads** — every classed part carries the
+      `tq-sprite` marker, so one rule stops them all (sprites added later included). The ripple's
+      second ring is pinned to `scale(.32)` (stopping alone would collapse both rings onto each other)
+      and bonk's sparks carry a static `opacity="0"`, so a stopped animation leaves them invisible —
+      the "cocked, not struck" still frame the family's own acceptance list asks for.
+- [x] **Wired into everything that enumerates styles** — the settings dropdown, the i18n key check and
+      the offline preview page all derive their lists from `LOADER_STYLES`, so the eight appear in each
+      without a second list to keep in sync.
+- [x] **Accepted in a real browser** (`.backups/_sprite-render-check.mjs`, 48 assertions):
+      24-unit viewBox, no size in the markup, `currentColor` on every leaf, the
+      font-size scaling (16px → 24px while the text goes 14px → 22px — the same `16px + delta` base the
+      plugin's own icons use, proportions unchanged), the sm/md/lg ladder, every animation running with
+      an advancing clock, and the still frame per icon. The self-check is the one that walks the
+      geometry table (no `px`, strokes ≥ 1.5 viewBox units) **and compares all eight sprites against
+      the delivered SVG files field by field** — the fidelity guard that an independent verification
+      showed was missing when a silently rounded coordinate passed every other assertion.
+## 0.10.0 — A rainbow that still keeps the contrast promise
 
 - [x] **A fifth preset, and it is not a colour** — `rainbow` is a sentinel like `shimmer`: the config
       stores the word and the stylesheet animates the line's **colour** through six fitted stops, icon

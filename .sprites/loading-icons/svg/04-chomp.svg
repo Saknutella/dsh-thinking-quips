@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-chomp / 追豆仔</title>
+  <style>
+    .bb-cp-orbit { animation: bb-cp-rot 1.6s linear infinite; }
+    .bb-cp-chew  { animation: bb-cp-chew .8s cubic-bezier(.45,0,.55,1) infinite; }
+    @keyframes bb-cp-rot { to { transform: rotate(360deg); } }
+    @keyframes bb-cp-chew {
+      0%, 100% { transform: rotate(13deg); }
+      50%      { transform: rotate(-13deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-cp-orbit, .bb-cp-chew { animation: none; }
+    }
+  </style>
+  <!-- 追豆仔：缺角大圆嘴(吃豆人式)在前、豆在后，整体绕圈追 + 嘴小幅开合咀嚼
+       锚点=盒中心；身 r=6.8(0.28h) 嘴开口±45deg；豆 r=1.8(直径0.15h)，缝1.6(1/15h) -->
+  <g transform="translate(12 12)">
+    <g class="bb-cp-orbit">
+      <g class="bb-cp-chew">
+        <path d="M0 0 L4.8 -4.8 A6.8 6.8 0 1 1 4.8 4.8 Z" fill="currentColor"/>
+      </g>
+      <circle cx="10.2" r="1.8" fill="currentColor"/>
+    </g>
+  </g>
+</svg>

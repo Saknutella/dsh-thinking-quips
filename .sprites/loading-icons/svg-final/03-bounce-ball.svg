@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bq-bounce-ball / 弹弹球</title>
+  <style>
+    .bq-bb-ball {
+      animation: bq-bb-jump 1.6s infinite;
+      transform-origin: 0 0; /* 锚点=球底中心 */
+    }
+    .bq-bb-shadow { animation: bq-bb-shadow 1.6s linear infinite; transform-origin: 0 0; }
+    @keyframes bq-bb-jump {
+      0%        { transform: translateY(0) scale(1, 1); }
+      34%       { transform: translateY(4.6px) scale(1, 1); animation-timing-function: ease-in; }
+      42%       { transform: translateY(4.6px) scale(1.2, .76); animation-timing-function: ease-out; }
+      60%       { transform: translateY(1.6px) scale(.9, 1.1); }
+      82%, 100% { transform: translateY(0) scale(1, 1); }
+    }
+    @keyframes bq-bb-shadow {
+      0%, 100% { transform: scaleX(.68); }
+      42%      { transform: scaleX(1); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bq-bb-ball, .bq-bb-shadow { animation: none; }
+    }
+  </style>
+  <!-- 经典挤压拉伸弹跳：球落下压扁、弹起拉伸，影子同步变宽变窄；球直径6.8(0.28h) 跳高4.6(0.19h) -->
+  <g transform="translate(12 18.8)">
+    <ellipse class="bq-bb-shadow" rx="2.7" ry="1.05" fill="currentColor" transform="scale(.68)"/>
+  </g>
+  <g transform="translate(12 11.4)">
+    <g class="bq-bb-ball">
+      <circle cy="-3.4" r="3.4" fill="currentColor"/>
+    </g>
+  </g>
+</svg>

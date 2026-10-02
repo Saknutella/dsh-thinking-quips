@@ -1,0 +1,26 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bq-wobble-flower / 摇摆花</title>
+  <style>
+    .bq-wf-flower { animation: bq-wf-sway 1.6s cubic-bezier(.45,0,.55,1) infinite; }
+    @keyframes bq-wf-sway {
+      0%, 100% { transform: rotate(-13deg); }
+      50%      { transform: rotate(13deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bq-wf-flower { animation: none; }
+    }
+  </style>
+  <!-- 一朵小花被风吹得绕茎底左右摇摆±13deg；花径15(0.63h) 茎长10(0.42h) -->
+  <g transform="translate(12 22)">
+    <g class="bq-wf-flower">
+      <line x1="0" y1="0" x2="0" y2="-10" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+      <g transform="translate(0 -10)" fill="currentColor">
+        <ellipse cy="-4.4" rx="2.1" ry="3.1"/>
+        <ellipse cy="4.4" rx="2.1" ry="3.1"/>
+        <ellipse cx="-4.4" rx="3.1" ry="2.1"/>
+        <ellipse cx="4.4" rx="3.1" ry="2.1"/>
+        <circle r="2.3"/>
+      </g>
+    </g>
+  </g>
+</svg>

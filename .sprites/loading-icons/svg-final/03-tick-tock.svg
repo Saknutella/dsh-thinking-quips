@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-tick-tock / 节拍仔</title>
+  <style>
+    .bb-tt-arm { animation: bb-tt-swing 1.6s cubic-bezier(.45,0,.55,1) infinite; }
+    @keyframes bb-tt-swing {
+      0%, 100% { transform: rotate(-42deg); }
+      50%      { transform: rotate(42deg); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-tt-arm { animation: none; }
+    }
+  </style>
+  <!-- 节拍器：梯形琴壳（两斜壁+底线）+ 摆杆绕底部轴心左右摆±42deg（轴在下面，杆在上面摆 = 节拍器，不是钟摆）
+       锚点=轴心；臂长8.4(0.35h)；壳宽11.2(0.47h) 高7.4 -->
+  <g transform="translate(12 13.6)">
+    <g stroke="currentColor" stroke-width="2.4" stroke-linecap="round" fill="none">
+      <path d="M-5.6 6.6 L-2.2 -0.8 M5.6 6.6 L2.2 -0.8 M-6.2 6.6 H6.2"/>
+    </g>
+    <g class="bb-tt-arm" stroke="currentColor" stroke-width="2.4" stroke-linecap="round">
+      <line x1="0" y1="1" x2="0" y2="-7.4"/>
+    </g>
+    <circle r="1.9" fill="currentColor"/>
+  </g>
+</svg>

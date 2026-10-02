@@ -1,0 +1,25 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bq-grow-pop / 蘑菇弹弹</title>
+  <style>
+    .bq-gp-shroom {
+      animation: bq-gp-grow 1.6s cubic-bezier(.45,0,.55,1) infinite;
+      transform-origin: 0 0; /* 锚点=柄底中心（贴地） */
+    }
+    @keyframes bq-gp-grow {
+      0%, 88%, 100% { transform: scale(1, .06); }   /* 缩在地里 */
+      22%           { transform: scale(1.06, .94); } /* 破土 */
+      32%           { transform: scale(.97, 1.05); } /* 回弹 */
+      42%, 72%      { transform: scale(1, 1); }      /* 挺立 */
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bq-gp-shroom { animation: none; }
+    }
+  </style>
+  <!-- 一颗蘑菇从地里长出来、挺一挺、又缩回去；伞直径12(0.5h) 柄宽3.6；全程 scaleY 0.06↔1，根点贴地不断开 -->
+  <g transform="translate(12 19)">
+    <g class="bq-gp-shroom" fill="currentColor">
+      <rect x="-1.8" y="-4.4" width="3.6" height="4.4" rx="1.4"/>
+      <path d="M-6 -4.4 A6 6 0 0 1 6 -4.4 Z"/>
+    </g>
+  </g>
+</svg>

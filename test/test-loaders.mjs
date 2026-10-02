@@ -7,6 +7,10 @@
 //   - --tq-loader-scale comes from LOADER_SCALES[size]
 // The module is imported once; each scenario calls factory() again for fresh state.
 
+// The contributed sprites are compared against the SVG files they were ported from, so the test
+// reads those files (Node's fs; the library is committed next to the plugin).
+import { readFileSync } from "node:fs";
+
 let loaded = null;
 let intervalFn = null;
 
@@ -599,7 +603,7 @@ console.log("\n── the native icon's sizing and its speed cue ──");
 // excluded — they size themselves and must not inherit a font-size the plugin invented.
 console.log("\n── the icons follow the content font size ──");
 {
-	const base = ".tq-loader-orbit,.tq-loader-ring,.tq-loader-pulse,.tq-loader-dots,.tq-loader-bars,.tq-loader-morph,.tq-loader-fish"
+	const base = ".tq-loader-orbit,.tq-loader-ring,.tq-loader-pulse,.tq-loader-dots,.tq-loader-bars,.tq-loader-morph,.tq-loader-fish,.tq-loader-sprites"
 		+ "{font-size:calc(16px + var(--dsh-content-font-delta,0px))}";
 	if (css.indexOf(base) === -1) {
 		throw new Error("the plugin's own icons do not follow --dsh-content-font-delta");
@@ -618,7 +622,10 @@ console.log("\n── the icons follow the content font size ──");
 		".tq-loader-morph", ".tq-loader-morph svg",
 		".tq-loader-fish", ".tq-loader-pulse i",
 		".tq-loader-dots", ".tq-loader-dots i",
-		".tq-loader-bars", ".tq-loader-bars i"
+		".tq-loader-bars", ".tq-loader-bars i",
+		// The contributed sprites: their box is 1em too, and the geometry table behind it is
+		// checked for pixel values separately (see the sprite section below).
+		".tq-loader-sprites svg"
 	];
 	// Anchored to a rule boundary: the base rule's selector LIST ends with `.tq-loader-fish{`,
 	// so the unanchored `rule()` helper would hand back the base rule instead of the geometry.
@@ -662,6 +669,236 @@ console.log("\n── the preview seam ──");
 	const ran = api.forcePass();
 	if (typeof ran !== "boolean") throw new Error(`forcePass must report whether it ran, got ${typeof ran}`);
 	console.log("OK   forcePass exists and is safe to call from the preview page");
+}
+
+// ── the contributed sprites (0.11.0) ─────────────────────────────────────────
+// The design brief's acceptance list, asserted instead of promised: geometry with no pixel value
+// anywhere, one 24-unit viewBox, currentColor paint, the family's shared 1.6s rhythm scaled by
+// --tq-speed, a readable still frame under reduced motion, and a transient part (bonk's sparks)
+// that disappears the moment the animation stops. Everything below drives the SHIPPED table and
+// the SHIPPED ensureLoader — no coordinate is re-declared here.
+console.log("\n── the contributed sprites ──");
+{
+	const SPRITES = api.LOADER_SPRITES;
+	if (SPRITES === null || typeof SPRITES !== "object") throw new Error("LOADER_SPRITES is not exposed");
+	const ids = Object.keys(SPRITES);
+	if (ids.length !== 8) throw new Error(`expected 8 contributed sprites, got ${ids.length}`);
+	for (const id of ids) {
+		if (api.LOADER_STYLES.indexOf(id) === -1) throw new Error(`${id} is a sprite but not a loader style`);
+	}
+	if (api.SPRITE_BOX !== 24) throw new Error(`the delivered viewBox is 24x24, got ${api.SPRITE_BOX}`);
+
+	// 1. Geometry is in viewBox units only. A `px` in the table would freeze the icon at one size
+	// whatever the font size does — the delivery spec calls that an automatic rejection.
+	const scan = (value, path) => {
+		if (typeof value === "number") {
+			if (!Number.isFinite(value)) throw new Error(`${path} is not a finite number`);
+			return;
+		}
+		if (typeof value === "string") {
+			if (value.indexOf("px") !== -1) throw new Error(`${path} carries a pixel value: ${value}`);
+			return;
+		}
+		if (Array.isArray(value)) { value.forEach((v, i) => scan(v, `${path}[${i}]`)); return; }
+		if (value && typeof value === "object") for (const key of Object.keys(value)) scan(value[key], `${path}.${key}`);
+	};
+	scan(SPRITES, "LOADER_SPRITES");
+
+	const walk = (node, out = []) => { out.push(node); for (const child of node.children || []) walk(child, out); return out; };
+	const classesOf = (node) => String(node.getAttribute("class") || "").split(/\s+/).filter(Boolean);
+	const inherited = (node, attr) => {
+		let up = node;
+		while (up) {
+			const value = up.getAttribute(attr);
+			if (value !== null) return value;
+			up = up.parentNode;
+		}
+		return null;
+	};
+	for (const id of ids) {
+		const span = applyWith(id, "md");
+		const svg = span.children[0];
+		if (!svg || svg.tagName !== "svg") throw new Error(`${id} does not build an <svg>`);
+		if (svg.getAttribute("viewBox") !== `0 0 ${api.SPRITE_BOX} ${api.SPRITE_BOX}`) {
+			throw new Error(`${id} viewBox is ${svg.getAttribute("viewBox")}`);
+		}
+		if (span.className.indexOf("tq-loader-sprites") === -1) throw new Error(`${id} is missing the sprite marker class`);
+		const nodes = walk(svg);
+		// Only the ROOT may not carry a size: a `<rect width="9.4">` is geometry, an
+		// `<svg width="24">` is the frozen size the delivery spec rejects.
+		if (svg.getAttribute("width") !== null || svg.getAttribute("height") !== null) {
+			throw new Error(`${id} writes a size onto the root svg; the box has to come from CSS`);
+		}
+		for (const node of nodes) {
+			// The delivery's own `<style>`/`<title>` are NOT ported: the animation lives in the
+			// plugin stylesheet, where --tq-speed and the shared reduced-motion rule can reach it.
+			if (node.tagName === "style" || node.tagName === "title") throw new Error(`${id} ported a <${node.tagName}> from the delivery`);
+		}
+		const leaves = nodes.filter((n) => (n.children || []).length === 0);
+		if (leaves.length === 0) throw new Error(`${id} draws nothing`);
+		for (const leaf of leaves) {
+			// One colour, always through currentColor: what makes the icon follow the theme and the
+			// user's colour setting. Group paint counts, so a stroked shape inside a painted group passes.
+			if (inherited(leaf, "fill") !== "currentColor" && inherited(leaf, "stroke") !== "currentColor") {
+				throw new Error(`${id} has an unpainted leaf: ${JSON.stringify(leaf._attrs)}`);
+			}
+			if (inherited(leaf, "stroke") === "currentColor") {
+				// The spec's floor: a stroke thinner than 1/16 of the box disappears at 14px.
+				const width = Number(inherited(leaf, "stroke-width"));
+				if (!(width >= 1.5)) throw new Error(`${id} strokes thinner than 1.5 viewBox units: ${width}`);
+			}
+		}
+		if (nodes.filter((n) => classesOf(n).indexOf("tq-sprite") !== -1).length === 0) {
+			throw new Error(`${id} has no tq-sprite part, so reduced motion could not freeze it`);
+		}
+	}
+	console.log(`OK   ${ids.length} sprites: 24-unit boxes, currentColor paint, no size in the markup`);
+
+	// 2. Every sprite animation reads the shared speed variable. The family ships ONE 1.6s rhythm;
+	// a part left at a fixed duration would drift out of phase with its siblings (bonk's strike,
+	// squash and sparks are a single gesture, and the ripple/sparkle pairs are half a cycle apart).
+	// The box of all eight is one selector list (which `rule()` cannot read, because its first
+	// selector is followed by a comma rather than a brace), so it is sliced out by hand.
+	const spriteBox = css.slice(css.indexOf(".tq-loader-jelly,"), css.indexOf(".tq-loader-sprites svg{"));
+	if (!/width:1em/.test(spriteBox) || !/height:1em/.test(spriteBox)) {
+		throw new Error(`the sprite boxes are not 1em square: ${spriteBox}`);
+	}
+	const slice = css.slice(css.indexOf(".tq-loader-jelly,"), css.indexOf("@media (prefers-reduced-motion:reduce)"));
+	const animations = [...slice.matchAll(/animation:[^;}]+/g)].map((m) => m[0]);
+	// Eleven declarations cover the twelve animated parts (the ripple's two rings and the two
+	// sparkle stars each share one rule); the exact count is pinned so a dropped one is caught.
+	if (animations.length !== 11) throw new Error(`expected 11 sprite animation declarations, found ${animations.length}`);
+	for (const decl of animations) {
+		if (decl.indexOf("calc(1.6s / var(--tq-speed,1))") === -1) throw new Error(`a sprite animation ignores the speed control: ${decl}`);
+	}
+	const KEYFRAMES = ["tq-jelly-squash", "tq-tick-swing", "tq-bonk-strike", "tq-bonk-squash", "tq-bonk-spark", "tq-pinwheel-spin", "tq-ripple-wave", "tq-bead-run", "tq-sparkle-bloom", "tq-bounce-jump", "tq-bounce-shadow"];
+	for (const name of KEYFRAMES) {
+		if (css.indexOf(`@keyframes ${name}{`) === -1) throw new Error(`missing @keyframes ${name}`);
+	}
+	for (const delay of [".tq-ripple-wave2{animation-delay:calc(-.8s / var(--tq-speed,1))}", ".tq-sparkle-small{animation-delay:calc(-.8s / var(--tq-speed,1))}"]) {
+		if (css.indexOf(delay) === -1) throw new Error(`missing the speed-scaled half-cycle delay: ${delay}`);
+	}
+	// The invariant that makes ONE reduced-motion rule sufficient: every class the sprite stylesheet
+	// animates must exist in the markup AND carry the tq-sprite marker. A part animated without the
+	// marker would keep moving with reduced motion on — which is the whole failure mode.
+	const marked = new Set();
+	for (const id of ids) {
+		for (const node of walk(applyWith(id, "md").children[0])) {
+			const names = classesOf(node);
+			if (names.indexOf("tq-sprite") !== -1) for (const name of names) marked.add(name);
+		}
+	}
+	const animatedClasses = [...slice.matchAll(/\.(tq-[A-Za-z0-9-]+)[^{},;]*\{[^}]*animation:/g)].map((m) => m[1]);
+	if (animatedClasses.length !== 11) throw new Error(`expected 11 animated class selectors, found ${animatedClasses.length}`);
+	for (const name of animatedClasses) {
+		if (!marked.has(name)) throw new Error(`.${name} is animated but is not a marked sprite part`);
+	}
+	console.log(`OK   11 sprite animations on the shared 1.6s clock, ${KEYFRAMES.length} keyframe sets`);
+
+	// 3. Reduced motion. One marker-class rule stops every sprite (including ones added later), and
+	// the two icons whose stopped state would otherwise be unreadable are pinned to a frame that
+	// reads: the ripple's rings must stay a concentric pair, and bonk's sparks vanish because their
+	// keyframes are their only visibility (a stopped animation leaves the static opacity="0").
+	// (`rule()` cannot read this block — its body holds nested braces, so its regex stops at the
+	// first `}`. Both declarations below name selectors that appear nowhere else in the sheet.)
+	if (css.indexOf(".tq-loader-sprites .tq-sprite{animation:none!important}") === -1) {
+		throw new Error("reduced motion does not stop the sprites");
+	}
+	if (css.indexOf(".tq-ripple-wave2{transform:scale(.32)}") === -1) {
+		throw new Error("the ripple's still frame collapses both rings onto each other");
+	}
+	const sparks = walk(applyWith("bonk", "md").children[0]).filter((n) => classesOf(n).indexOf("tq-bonk-spark") !== -1);
+	if (sparks.length !== 1 || sparks[0].tagName !== "g") throw new Error(`bonk should ship its sparks as one marked group, got ${sparks.length}`);
+	if (sparks[0].getAttribute("opacity") !== "0") throw new Error("bonk's sparks would stay visible in the still frame");
+	if ((sparks[0].children || []).length !== 2) throw new Error("the spark group should hold both lines");
+	console.log("OK   reduced motion freezes every sprite; the ripple keeps its pair, bonk's sparks vanish");
+
+	// 4. The delivered SVGs are the SPEC OF RECORD, so the table is compared against those FILES
+	// rather than against a transcription of them. Everything above checks an invariant (no px,
+	// marked parts, the speed variable, the still frame); none of it reads the delivery, so a
+	// silently rounded or mistyped coordinate used to pass the whole suite — found by an independent
+	// verification that changed one delivered value and watched every assertion stay green.
+	const DELIVERED = {
+		jelly: "02-jelly.svg",
+		tickTock: "03-tick-tock.svg",
+		bonk: "05-bonk.svg",
+		pinwheel: "06-pinwheel.svg",
+		ripple: "07-ripple.svg",
+		beadRun: "08-bead-run.svg",
+		sparkleSwap: "02-sparkle-swap.svg",
+		bounceBall: "03-bounce-ball.svg"
+	};
+	const SHAPES = {
+		rect: ["x", "y", "width", "height", "rx"],
+		circle: ["cx", "cy", "r"],
+		ellipse: ["cx", "cy", "rx", "ry"],
+		line: ["x1", "y1", "x2", "y2"],
+		path: ["d"]
+	};
+	// Numbers compare as numbers (`-4.70` = `-4.7`), path data has its whitespace and numbers
+	// normalised, and an absent attribute counts as the SVG default (0 for geometry, 1 for opacity).
+	const num = (value) => {
+		const text = String(value).trim();
+		return Number.isFinite(Number(text)) ? String(Number(text)) : text;
+	};
+	const pathData = (d) => String(d).replace(/[0-9]*\.?[0-9]+/g, num).replace(/\s+/g, " ").trim();
+	const chainOf = (list) => list.map((t) => String(t).replace(/\s+/g, " ").trim()).join("|").replace(/(-?[0-9]*\.?[0-9]+)/g, num);
+	const geoOf = (shape, attrs) => SHAPES[shape].map((key) => (key === "d" ? pathData(attrs[key]) : num(attrs[key] === undefined ? 0 : attrs[key]))).join(",");
+	// Opacity is INHERITED in SVG, so a group's `opacity="0"` reaches its leaves: the signature
+	// multiplies down the chain (the delivery hides its sparks that way, on the `<g>`).
+	const signature = (shape, attrs, chain, opacity) => [shape, geoOf(shape, attrs), chainOf(chain), num(opacity)].join(" ");
+	/** Leaf signatures from one delivered file: a tiny tag-stack parse, transforms accumulated. */
+	const deliveredSignatures = (text) => {
+		const root = { tag: "#root", attrs: {}, children: [] };
+		const stack = [root];
+		const tagRe = /<(\/?)([a-zA-Z][-a-zA-Z0-9]*)((?:\s+[^<>]*?)?)(\/?)>/g;
+		let m;
+		while ((m = tagRe.exec(text)) !== null) {
+			if (m[1] === "/") { stack.pop(); continue; }
+			const attrs = {};
+			for (const a of m[3].matchAll(/([a-zA-Z_:][-a-zA-Z0-9_:.]*)\s*=\s*"([^"]*)"/g)) attrs[a[1]] = a[2];
+			const node = { tag: m[2], attrs, children: [] };
+			stack[stack.length - 1].children.push(node);
+			if (m[4] !== "/") stack.push(node);
+		}
+		const out = [];
+		const visit = (node, chain, opacity) => {
+			const next = node.attrs.transform === undefined ? chain : chain.concat(node.attrs.transform);
+			const alpha = node.attrs.opacity === undefined ? opacity : opacity * Number(node.attrs.opacity);
+			if (SHAPES[node.tag] !== undefined) out.push(signature(node.tag, node.attrs, next, alpha));
+			for (const child of node.children) visit(child, next, alpha);
+		};
+		visit(root, [], 1);
+		return out;
+	};
+	/** The same signatures from the shipped table (geometry stored as numbers). */
+	const tableSignatures = (spec) => {
+		const out = [];
+		const visit = (parts, chain, opacity) => {
+			for (const part of parts) {
+				const attrs = part.attrs || {};
+				const next = attrs.transform === undefined ? chain : chain.concat(attrs.transform);
+				const alpha = attrs.opacity === undefined ? opacity : opacity * Number(attrs.opacity);
+				if (SHAPES[part.tag] !== undefined) out.push(signature(part.tag, attrs, next, alpha));
+				visit(part.parts || [], next, alpha);
+			}
+		};
+		visit(spec.parts || [], [], 1);
+		return out;
+	};
+	for (const id of ids) {
+		const file = DELIVERED[id];
+		if (file === undefined) throw new Error(`${id} has no delivered file mapped`);
+		const text = readFileSync(new URL(`../.sprites/loading-icons/svg-final/${file}`, import.meta.url), "utf8");
+		const want = deliveredSignatures(text).slice().sort();
+		const got = tableSignatures(SPRITES[id]).slice().sort();
+		if (want.join("\n") !== got.join("\n")) {
+			const missing = want.filter((s) => got.indexOf(s) === -1);
+			const extra = got.filter((s) => want.indexOf(s) === -1);
+			throw new Error(`${id} does not match its delivered ${file}\n    delivered only: ${missing.join(" ; ")}\n    table only:     ${extra.join(" ; ")}`);
+		}
+	}
+	console.log(`OK   all ${ids.length} sprites still match their delivered SVG geometry field by field`);
 }
 
 console.log("ALL LOADER CHECKS PASSED");

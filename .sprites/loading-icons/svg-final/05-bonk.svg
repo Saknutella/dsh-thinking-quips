@@ -1,0 +1,44 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-bonk / 敲敲仔</title>
+  <style>
+    .bb-bk-stick { animation: bb-bk-strike 1.6s cubic-bezier(.45,0,.55,1) infinite; }
+    .bb-bk-block {
+      animation: bb-bk-squash 1.6s cubic-bezier(.45,0,.55,1) infinite;
+      transform-origin: 0 0; /* 锚点=方块底部中心 */
+    }
+    .bb-bk-spark { animation: bb-bk-spark 1.6s linear infinite; }
+    @keyframes bb-bk-strike {
+      0%, 30%, 100% { transform: translateY(0); }
+      10%           { transform: translateY(2px); }  /* 敲下 */
+      20%           { transform: translateY(.4px); } /* 敲后回弹 */
+    }
+    @keyframes bb-bk-squash {
+      0%, 10%, 36%, 72%, 100% { transform: scale(1, 1); }
+      16%                     { transform: scale(1.12, .84); } /* 被敲压扁 */
+      26%                     { transform: scale(.96, 1.05); } /* 弹起 */
+      84%                     { transform: scale(1.01, .99); } /* 待机微呼吸 */
+    }
+    @keyframes bb-bk-spark {
+      0%, 9%     { opacity: 0; }
+      12%, 20%   { opacity: 1; }  /* 敲击瞬间两侧火星 */
+      23%, 100%  { opacity: 0; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-bk-stick, .bb-bk-block, .bb-bk-spark { animation: none; }
+    }
+  </style>
+  <!-- 一根小棍从右上敲下，方块被敲压扁回弹，敲击瞬间两侧闪火星（火星静态隐藏）
+       棍长7.8(0.33h) 45deg斜置，行程2(0.083h)；方块8x8(0.33h)；火星线长2.83 -->
+  <g transform="translate(12.85 4.75) rotate(45)">
+    <g class="bb-bk-stick">
+      <line x1="0" y1="-6.6" x2="0" y2="1.2" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+    </g>
+  </g>
+  <g transform="translate(12 15.2)">
+    <rect class="bb-bk-block" x="-4" y="-8" width="8" height="8" rx="2.2" fill="currentColor"/>
+  </g>
+  <g class="bb-bk-spark" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" opacity="0">
+    <line x1="8.6" y1="5.4" x2="6.6" y2="3.4"/>
+    <line x1="15.4" y1="5.4" x2="17.4" y2="3.4"/>
+  </g>
+</svg>

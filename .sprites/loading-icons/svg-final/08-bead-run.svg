@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-bead-run / 进度珠</title>
+  <style>
+    .bb-br-bead { animation: bb-br-run 1.6s linear infinite; }
+    @keyframes bb-br-run {
+      0%        { transform: translateX(0);      opacity: 1; }
+      78%       { transform: translateX(10.4px); opacity: 1; }
+      84%       { transform: translateX(10.4px); opacity: 0; }
+      85%       { transform: translateX(0);      opacity: 0; }
+      92%, 100% { transform: translateX(0);      opacity: 1; }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-br-bead { animation: none; }
+    }
+  </style>
+  <!-- 线长10.4(0.43h)为轨道；珠 r=2(直径0.17h)骑线从左端到右端，右端渐隐、左端静默重生成 -->
+  <g transform="translate(12 12)">
+    <line x1="-5.2" y1="0" x2="5.2" y2="0" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"/>
+    <circle class="bb-br-bead" cx="-5.2" r="2" fill="currentColor"/>
+  </g>
+</svg>

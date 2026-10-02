@@ -1,0 +1,37 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bq-bubble-blow / 吹泡泡</title>
+  <style>
+    .bq-bb2-head {
+      animation: bq-bb2-jolt 1.6s cubic-bezier(.45,0,.55,1) infinite;
+      transform-origin: 0 0; /* 锚点=头心 */
+    }
+    .bq-bb2-bubble {
+      animation: bq-bb2-bubble 1.6s linear infinite;
+      transform-origin: 0 0; /* 锚点=泡心 */
+    }
+    @keyframes bq-bb2-bubble {
+      0%        { opacity: 0; transform: scale(.3); }
+      8%        { opacity: 1; transform: scale(.45); }
+      50%, 55%  { opacity: 1; transform: scale(1); }
+      55.5%     { transform: scale(1.05); } /* 临破鼓一下 */
+      58%, 100% { opacity: 0; transform: scale(1.1); } /* 破 */
+    }
+    @keyframes bq-bb2-jolt {
+      0%, 56%, 100% { transform: scale(1, 1); }
+      62%           { transform: scale(1.06, .92); } /* 泡破吓一跳 */
+      72%           { transform: scale(.97, 1.04); }
+      82%           { transform: scale(1, 1); }
+      90%           { transform: scale(1.01, .99); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bq-bb2-head, .bq-bb2-bubble { animation: none; }
+    }
+  </style>
+  <!-- 一个圆头吹泡泡：泡从头顶小点长大、贴到头边、啪地破了，头被吓得一抖；头 r5(0.21h) 泡满径6.8 -->
+  <g transform="translate(17.2 10.6)">
+    <circle class="bq-bb2-bubble" r="3.4" fill="none" stroke="currentColor" stroke-width="2.4"/>
+  </g>
+  <g transform="translate(8.5 12)">
+    <circle class="bq-bb2-head" r="5" fill="currentColor"/>
+  </g>
+</svg>

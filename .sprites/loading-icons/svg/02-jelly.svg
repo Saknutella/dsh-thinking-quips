@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="1em" height="1em" fill="none">
+  <title>bb-jelly / 果冻块</title>
+  <style>
+    .bb-jl-body {
+      animation: bb-jl-squash 1.6s cubic-bezier(.45,0,.55,1) infinite;
+      transform-origin: 0 0; /* 锚点=底部中心，压扁贴地 */
+    }
+    @keyframes bb-jl-squash {
+      0%, 54%, 100% { transform: scale(1, 1); }
+      28%           { transform: scale(1.08, .84); }
+      42%           { transform: scale(.95, 1.05); }
+      76%           { transform: scale(1.02, .98); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+      .bb-jl-body { animation: none; }
+    }
+  </style>
+  <!-- 锚点=底部中心；块 9.4x9.4(0.39h)，rx 2.7(0.11h)；压扁至0.84高、横胀至1.08宽 -->
+  <g transform="translate(12 16.8)">
+    <rect class="bb-jl-body" x="-4.7" y="-9.4" width="9.4" height="9.4" rx="2.7" fill="currentColor"/>
+  </g>
+</svg>
