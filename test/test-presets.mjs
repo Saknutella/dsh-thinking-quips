@@ -355,13 +355,25 @@ console.log("\n── the rainbow preset ──");
 			css.indexOf("text-fill-color") === -1 && css.indexOf("background-clip") === -1 && css.indexOf("background-image") === -1,
 			"no fill/clip tricks in the rainbow sheet");
 		// A WHITELIST, not a blacklist: the only colours this sheet may name are the six fitted
-		// stops. A blacklist needs a new word for every way of hiding text — an independent
-		// verification kept the six stops and added `0%{color:transparent}` and no assertion caught
-		// it, which is the same "the text disappears" symptom this feature already had once.
+		// stops, plus `var(--tq-ink)` — the registered property the keyframes drive and route into
+		// the shell's own tokens. A blacklist needs a new word for every way of hiding text — an
+		// independent verification kept the six stops and added `0%{color:transparent}` and no
+		// assertion caught it, which is the same "the text disappears" symptom this feature had once.
+		const allowed = stops.concat(["var(--tq-ink)"]);
 		const named = [...css.matchAll(/color:([^;}!]+)/g)].map((m) => m[1].trim());
 		ok(`rainbow @ ${label}: every colour the sheet names is a fitted stop`,
-			named.length > 0 && named.every((c) => stops.indexOf(c) !== -1),
+			named.length > 0 && named.every((c) => allowed.indexOf(c) !== -1),
 			`${named.length} colour(s): ${named.join(", ")}`);
+		// The routing itself, which is what makes the icon and the shell's own text share ONE clock
+		// (the complaint behind it: "with the rainbow the icon and the text do not transition
+		// together" — the shell paints its glyphs from these tokens, not from `color`).
+		ok(`rainbow @ ${label}: the shell's own paint follows the animated colour`,
+			css.indexOf("@property --tq-ink{syntax:\"<color>\";inherits:true") !== -1
+			&& css.indexOf("--dsw-alias-label-deep-diving:var(--tq-ink)") !== -1
+			&& css.indexOf("--dsw-alias-label-shimmer:color-mix(in srgb, var(--tq-ink)") !== -1
+			&& css.indexOf(".tq-line [data-shimmer-text]{color:var(--tq-ink) !important}") !== -1
+			&& css.indexOf("--tq-ink:" + stops[0]) !== -1,
+			"a registered --tq-ink driven by the keyframes, read by both tokens and by the base glyphs");
 		// `animation:none` alone is not enough: it leaves DSH's own colour, so the line stops being a
 		// rainbow at all (measured in a browser: it fell back to the shell's brand blue). Reduced
 		// motion must freeze the spectrum at its leading stop, which is fitted like every other one.

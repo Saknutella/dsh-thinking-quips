@@ -2853,22 +2853,46 @@ window.__ModuleLoader__.load({
 		* the ancestor does not paint pseudo-element glyphs. With `-webkit-text-fill-color: transparent`
 		* on the line the text vanished and only the icon was left (reported by the user). `color`
 		* inherits into the pseudo-element, so this cannot hide anything, whatever the effect is.
+		*
+		* WHY IT ALSO DRIVES DSH'S OWN TOKENS (the second report: "with the rainbow the icon and the
+		* text do not transition together"): the shell's visible text is painted by `TextShimmer` from
+		* `--dsw-alias-label-deep-diving` / `--dsw-alias-label-shimmer`, NOT from `color`, so animating
+		* `color` moved the icon while the text sat on whatever static value those tokens held — the
+		* sweep token was a fixed `#f06666` from the leading stop (measured: the line cycled through
+		* six hues while the sweep never changed). A keyframe cannot animate a custom property unless it
+		* is registered, so `--tq-ink` is declared as a `<color>` through `@property` and the animation
+		* writes it alongside `color`; the two tokens then read the same live value. An engine without
+		* `@property` steps through the stops instead of interpolating, and one without `color-mix`
+		* drops the highlight declaration and keeps the static sweep written by `paintHost`.
 		* @param bg - the app background the stops are fitted against.
+		* @param glow - the sweep brightness, 0-100 (the highlight stays a brighter version of the hue).
 		* @returns the CSS text.
 		*/
-		function rainbowCSS(bg) {
+		function rainbowCSS(bg, glow) {
 			const stops = rainbowStops(bg);
 			const speed = "calc(6s / var(--tq-speed,1))";
-			const ink = stops.map((color, i) => Math.round((i / stops.length) * 100) + "%{color:" + color + "}").join("")
-				+ "100%{color:" + stops[0] + "}";
+			const at = (i) => Math.round((i / stops.length) * 100) + "%";
+			const ink = stops.map((color, i) => at(i) + "{color:" + color + ";--tq-ink:" + color + "}").join("")
+				+ "100%{color:" + stops[0] + ";--tq-ink:" + stops[0] + "}";
 			const flow = "animation:tq-rainbow-ink " + speed + " linear infinite !important";
+			const share = Math.max(0, Math.min(100, 100 - (Number.isFinite(glow) ? glow : 0)));
 			return ""
-				+ ".tq-line,.tq-wave{" + flow + "}"
+				+ "@property --tq-ink{syntax:\"<color>\";inherits:true;initial-value:" + stops[0] + "}"
+				+ ".tq-line,.tq-wave{--tq-ink:" + stops[0]
+				+ ";--dsw-alias-label-deep-diving:var(--tq-ink)"
+				+ ";--dsw-alias-label-shimmer:color-mix(in srgb, var(--tq-ink) " + share + "%, white)"
+				+ ";" + flow + "}"
 				+ ".tq-loader{" + flow + "}"
+				// The shell's own base glyphs: `TextShimmer`'s `.text` carries an EXPLICIT colour
+				// rather than a token (measured: it stayed `rgb(43, 83, 199)` while the sweep followed
+				// the hue), so the token routing above cannot reach it. `data-shimmer-text` is the
+				// stable attribute the plugin already reads for the elapsed clock, and the visible
+				// glyphs are that element's `::after`, which inherits from it.
+				+ ".tq-line [data-shimmer-text]{color:var(--tq-ink) !important}"
 				+ "[role=\"status\"][class*=\"turnStatus\"]{" + flow + "}"
 				+ "@keyframes tq-rainbow-ink{" + ink + "}"
 				+ "@media (prefers-reduced-motion:reduce){.tq-line,.tq-wave,.tq-loader,[role=\"status\"][class*=\"turnStatus\"]"
-				+ "{animation:none !important;color:" + stops[0] + " !important}}";
+				+ "{animation:none !important;color:" + stops[0] + " !important}.tq-line [data-shimmer-text]{color:" + stops[0] + " !important}}";
 		}
 		/**
 		* Apply the configured colour and sweep brightness.
@@ -2915,7 +2939,7 @@ window.__ModuleLoader__.load({
 				// No flat colour to write: the gradient paints the text and the icon has its own
 				// keyframes. The sweep token still answers the brightness control, keyed off the
 				// rainbow's leading colour so the two controls do not fight.
-				el.textContent = rainbowCSS(bg);
+				el.textContent = rainbowCSS(bg, glow);
 				tintHost(null, sweep);
 				return;
 			}

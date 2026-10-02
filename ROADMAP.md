@@ -67,7 +67,29 @@ The indicator is the differentiator, so make it a first-class, configurable elem
 - [ ] **Morph speed** — exposed by 0.6.0's global multiplier; a no-rotation variant
       for anyone who wants the shape change on its own is still open.
 
-## 0.11.2 — Three fixes reported from real use (current)
+## 0.11.3 — The rainbow drives the shell's own paint too (current)
+
+- [x] **The icon and the text share one clock now** — reported as "with the rainbow the icon and the
+      text do not transition together", and the screenshot agreed: a teal icon beside red text. The
+      shell paints its visible glyphs through `TextShimmer`, which reads
+      `--dsw-alias-label-deep-diving` / `--dsw-alias-label-shimmer` and NOT `color` — so animating
+      `color` moved the icon while the text sat on the static sweep token written from the leading
+      stop (measured: `#f06666`, unchanged, while the line cycled through six hues). A keyframe
+      cannot animate a custom property unless it is registered, so `--tq-ink` is declared as a
+      `<color>` through `@property`, the keyframes drive it beside `color`, and both tokens read it;
+      the highlight stays a brighter version of the live hue via `color-mix`. `TextShimmer`'s base
+      `.text` carries an EXPLICIT colour rather than a token (measured: it stayed
+      `rgb(43, 83, 199)`), so the sheet also colours `[data-shimmer-text]` — the stable attribute
+      the plugin already reads for the elapsed clock, and the element whose `::after` draws the
+      glyphs.
+- [x] **Measured, not assumed** — in a browser the icon, the glyphs and the sweep now agree at every
+      instant (four samples across one cycle: `rgb(74,127,10)`, `rgb(12,128,147)`, `rgb(168,32,200)`,
+      `rgb(232,19,26)` — all three parts equal per sample), where the sweep used to be a constant.
+      `test-presets.mjs` pins the routing (the registered property, both token writes, the base-glyph
+      rule), and its colour whitelist admits `var(--tq-ink)` while still failing on any literal that
+      is not a fitted stop — a hidden `color:transparent` still fails.
+
+## 0.11.2 — Three fixes reported from real use
 
 - [x] **The plugin's own spinner ring is gone** — it was the same gesture as DSH's official state dot,
       which this plugin can render, so keeping both only made the dropdown longer. A saved choice of
